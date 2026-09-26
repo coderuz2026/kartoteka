@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>HP CF283A (моб.) — Картотека</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',sans-serif;background:#F7F4EE;color:#1B1F2A}
+h1{font-family:'Fraunces',serif;margin:0}
+a{color:#E2762B;text-decoration:none}
+.mono{font-family:'IBM Plex Mono',monospace}
+button{font-family:inherit;cursor:pointer;border:none}
+.card{background:#FFFFFF;border:1px solid #E7E2D8;border-radius:14px;box-sizing:border-box}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:600}
+.pill-dot{width:5px;height:5px;border-radius:50%}
+.pill-critical{background:#F8E4DF;color:#8A2E22}
+.pill-critical .pill-dot{background:#B23A2E}
+.tag{display:inline-flex;padding:5px 10px;border-radius:8px;background:#F3EFE6;color:#4B4F5B;font-size:11.5px;font-weight:500}
+.field-label{font-size:10.5px;color:#9CA0AE;text-transform:uppercase;letter-spacing:0.4px}
+.field-value{font-size:13px;font-weight:600}
+.gauge-body{position:relative;width:100%;height:60px;border:2px solid #1B1F2A;border-radius:12px;background:#FFFFFF;overflow:hidden;box-sizing:border-box}
+.gauge-nub{position:absolute;left:18px;top:-12px;width:28px;height:14px;border:2px solid #1B1F2A;border-bottom:none;border-radius:5px 5px 0 0;background:#FFFFFF}
+.gauge-fill-big{position:absolute;left:0;top:0;bottom:0;background:#B23A2E;border-radius:9px 0 0 9px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:7px;background:#E2762B;color:#fff;border-radius:10px;padding:12px;font-size:13.5px;font-weight:600;flex:1}
+.btn-secondary{display:flex;align-items:center;justify-content:center;background:#FFFFFF;border:1px solid #E7E2D8;color:#1B1F2A;border-radius:10px;padding:12px 16px;font-size:13.5px;font-weight:600}
+</style>
+</helmet>
+
+<div style="width:390px;height:844px;background:#F7F4EE;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column">
+
+  <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;box-sizing:border-box;background:#FFFFFF;border-bottom:1px solid #E7E2D8">
+    <a href="Inventory-Mobile.dc.html" style="display:flex;color:#4B4F5B">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <span style="font-size:15px;font-weight:600">Карточка картриджа</span>
+  </div>
+
+  <div style="flex-grow:1;overflow:hidden;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <div style="width:46px;height:46px;border-radius:12px;background:#2A2C33;flex-shrink:0"></div>
+      <div style="min-width:0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <h1 style="font-size:18px">HP CF283A</h1>
+        </div>
+        <span class="pill pill-critical" style="margin-top:3px"><span class="pill-dot"></span>Критично</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span class="field-label">Остаток</span>
+        <span class="mono" style="font-size:11.5px;color:#8A2E22;font-weight:600">3 из 5 мин.</span>
+      </div>
+      <div style="position:relative;padding-top:12px">
+        <div class="gauge-nub"></div>
+        <div class="gauge-body">
+          <div class="gauge-fill-big" style="width:15%"></div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+            <span class="mono" style="font-size:19px;font-weight:600">3 <span style="font-size:12px;font-weight:400;color:#6B7280">/ 20</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:13px 14px;background:#FBF3E9;border-color:#F0DCB8;display:flex;gap:10px;align-items:flex-start">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#8F5C0C" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 6h4v4"/></svg>
+      <span style="font-size:12px;color:#8F5C0C">Закончится через ~18 дней при текущем темпе списания</span>
+    </div>
+
+    <div class="card" style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div><span class="field-label">Тип</span><div class="field-value">Тонер</div></div>
+      <div><span class="field-label">Цвет</span><div class="field-value">Чёрный</div></div>
+      <div><span class="field-label">Поставщик</span><div class="field-value">ОфисСнаб</div></div>
+      <div><span class="field-label">Цена</span><div class="field-value mono">2 450 ₽</div></div>
+    </div>
+
+    <div class="card" style="padding:14px 16px;flex-grow:1;min-height:0;overflow:hidden">
+      <span class="field-label">Совместимые принтеры</span>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+        <span class="tag">LaserJet Pro M125nw</span>
+        <span class="tag">LaserJet Pro M127fn</span>
+        <span class="tag">MFP M225</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:10px;padding:12px 18px 20px;background:#FFFFFF;border-top:1px solid #E7E2D8;box-sizing:border-box">
+    <button class="btn-secondary">Списать</button>
+    <a href="ReceiveIssue.dc.html" class="btn-primary">Пополнить</a>
+  </div>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
