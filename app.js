@@ -1,0 +1,1730 @@
+/* ---------- icons ---------- */
+const ICONS = {
+  home: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9h13v-9"/></svg>`,
+  box: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5-9 4.5-9-4.5Z"/><path d="M3 7.5V16l9 4.5 9-4.5V7.5"/><path d="M12 12v8.5"/></svg>`,
+  printer: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="8" rx="1.5"/><path d="M6 11h12v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-7Z"/><path d="M9 15h6"/></svg>`,
+  truck: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17.5" cy="18" r="1.6"/></svg>`,
+  clock: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`,
+  settings: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l1.7-1.3-2-3.4-2 .6a7.7 7.7 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.4a7.7 7.7 0 0 0-2.6 1.5l-2-.6-2 3.4L4.6 10.5a7.6 7.6 0 0 0 0 3L2.9 14.8l2 3.4 2-.6a7.7 7.7 0 0 0 2.6 1.5l.5 2.4h4l.5-2.4a7.7 7.7 0 0 0 2.6-1.5l2 .6 2-3.4-1.7-1.3Z"/></svg>`,
+  search: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>`,
+  bell: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 3.5 1 5 1.5 6H4.5C5 14 6 12.5 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>`,
+  plus: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  minus: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>`,
+  excel: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 12 4 5M13 12l-4 5"/></svg>`,
+  back: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
+  forecast: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 6h4v4"/></svg>`,
+  x: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
+  check: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  dots: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>`,
+  barcode: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5v14M8 5v14M11 5v14M14 5v9M17 5v14M20 5v14"/></svg>`,
+  edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"/></svg>`,
+  trash: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><path d="M8 7v13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7"/><path d="M10 11v6M14 11v6"/></svg>`,
+  transfer: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>`,
+  store: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/></svg>`,
+};
+
+/* ---------- data ---------- */
+const STORAGE_KEY = 'kartoteka-data-v1';
+// The main warehouse keeps its stock in c.stock (so min-stock status, suppliers and
+// printers keep working unchanged); branches keep theirs in c.branchStock[whId].
+const MAIN_WH = 'main';
+
+function defaultWarehouses(){
+  return [
+    {id:MAIN_WH, name:'ДеФактум'},
+    {id:'kids', name:'Кидс'},
+    {id:'megapolis', name:'Мегаполис'},
+  ];
+}
+
+const TYPE_LABELS = {toner:'Тонер', ink:'Чернила'};
+// Cartridge colors are a fixed list; the label chip color follows from it.
+const COLORS = {
+  'Чёрный': '#23252B',
+  'Голубой': '#1E9BB3',
+  'Розовый': '#D6408B',
+  'Жёлтый': '#E0AE2E',
+};
+const COLOR_ALIASES = {'пурпурный':'Розовый', 'малиновый':'Розовый', 'magenta':'Розовый', 'cyan':'Голубой', 'синий':'Голубой', 'yellow':'Жёлтый', 'желтый':'Жёлтый', 'black':'Чёрный', 'черный':'Чёрный'};
+function normalizeColor(color){
+  const s = String(color || '').trim();
+  if(COLORS[s]) return s;
+  return COLOR_ALIASES[s.toLowerCase()] || 'Чёрный';
+}
+function colorHexOf(c){ return COLORS[normalizeColor(c.color)]; }
+
+function demoCartridge(id, name, barcode, type, color, stock, branchStock, supplier, location, onOrder){
+  return {id, name, barcode, type, typeLabel: TYPE_LABELS[type], color, colorHex: COLORS[color], stock, branchStock: branchStock || {}, supplier, location, onOrder: !!onOrder};
+}
+
+function defaultData(){
+  return {
+    warehouses: defaultWarehouses(),
+    cartridges: [
+      demoCartridge('hp-cf283a', 'HP CF283A', '4650123450017', 'toner', 'Чёрный', 3, {kids:2}, 'ОфисСнаб', 'Стеллаж А-12'),
+      demoCartridge('canon-725', 'Canon 725', '4650123450024', 'toner', 'Чёрный', 6, {kids:1, megapolis:2}, 'ОфисСнаб', 'Стеллаж Б-04'),
+      demoCartridge('epson-664-cyan', 'Epson 664 Cyan', '4650123450031', 'ink', 'Голубой', 22, null, 'ОфисСнаб', 'Стеллаж В-01'),
+      demoCartridge('epson-664-magenta', 'Epson 664 Magenta', '4650123450048', 'ink', 'Розовый', 4, null, 'ОфисСнаб', 'Стеллаж В-01'),
+      demoCartridge('epson-664-yellow', 'Epson 664 Yellow', '4650123450055', 'ink', 'Жёлтый', 18, null, 'ОфисСнаб', 'Стеллаж В-01'),
+      demoCartridge('epson-664-black', 'Epson 664 Black', '4650123450062', 'ink', 'Чёрный', 30, {kids:4, megapolis:3}, 'ОфисСнаб', 'Стеллаж В-01'),
+      demoCartridge('kyocera-tk1170', 'Kyocera TK-1170', '4650123450079', 'toner', 'Чёрный', 7, {megapolis:2}, 'ОфисСнаб', 'Стеллаж А-07'),
+      demoCartridge('xerox-106r02773', 'Xerox 106R02773', '4650123450086', 'toner', 'Чёрный', 2, null, 'ОфисСнаб', 'Стеллаж Б-09'),
+      demoCartridge('brother-tn2375', 'Brother TN-2375', '4650123450093', 'toner', 'Чёрный', 9, {kids:1}, 'ОфисСнаб', 'Стеллаж А-03'),
+      demoCartridge('hp-664-black-ink', 'HP 664 Black', '4650123450109', 'ink', 'Чёрный', 0, null, 'ОфисСнаб', 'Стеллаж В-05', true),
+      demoCartridge('samsung-mltd111s', 'Samsung MLT-D111S', '4650123450123', 'toner', 'Чёрный', 11, null, 'ОфисСнаб', 'Стеллаж А-15'),
+    ],
+    history: {
+      'hp-cf283a': [
+        {date:'2026-09-26', type:'transfer', from:MAIN_WH, to:'kids', qty:2, result:3, resultTo:2, who:'—', dept:''},
+        {date:'2026-09-26', type:'issue', wh:MAIN_WH, printerId:'p-hp-m125nw', printerName:'HP LaserJet Pro M125nw', qty:1, result:5, who:'Ирина С.', dept:''},
+        {date:'2026-09-20', type:'issue', wh:MAIN_WH, printerId:'p-hp-m127fw', printerName:'HP LaserJet Pro M127fw', qty:1, result:6, who:'Павел М.', dept:''},
+        {date:'2026-09-14', type:'issue', wh:MAIN_WH, printerId:'p-hp-m125nw', printerName:'HP LaserJet Pro M125nw', qty:1, result:7, who:'Ирина С.', dept:''},
+        {date:'2026-09-05', type:'issue', wh:MAIN_WH, printerId:'p-hp-m225', printerName:'HP LaserJet MFP M225', qty:1, result:8, who:'Ольга Р.', dept:''},
+        {date:'2026-08-22', type:'issue', wh:MAIN_WH, printerId:'p-hp-m127fw', printerName:'HP LaserJet Pro M127fw', qty:1, result:9, who:'Павел М.', dept:''},
+        {date:'2026-08-10', type:'receive', wh:MAIN_WH, qty:10, result:10, who:'ОфисСнаб', dept:'Накладная №4290'},
+      ],
+    },
+    activity: [
+      {date:'сегодня, 11:30', type:'transfer', text:'HP CF283A ×2', meta:'ДеФактум → Кидс'},
+      {date:'сегодня, 10:24', type:'issue', text:'HP CF283A ×1', meta:'ДеФактум · HP LaserJet Pro M125nw'},
+      {date:'сегодня, 09:05', type:'receive', text:'Epson 664 (набор) ×4', meta:'ОфисСнаб'},
+      {date:'вчера, 17:40', type:'issue', text:'Kyocera TK-1170 ×1', meta:'Мегаполис · Kyocera M2040dn'},
+    ],
+    printers: [
+      {id:'p-hp-m125nw', name:'HP LaserJet Pro M125nw', location:'Бухгалтерия', wh:MAIN_WH, serial:'—', notes:''},
+      {id:'p-hp-m127fw', name:'HP LaserJet Pro M127fw', location:'Отдел продаж', wh:MAIN_WH, serial:'—', notes:''},
+      {id:'p-hp-m225', name:'HP LaserJet MFP M225', location:'Дирекция', wh:MAIN_WH, serial:'—', notes:''},
+      {id:'p-canon-lbp6000', name:'Canon i-SENSYS LBP6000', location:'Ресепшн', wh:'kids', serial:'—', notes:''},
+      {id:'p-epson-l132', name:'Epson L132', location:'Ресепшн', wh:'kids', serial:'—', notes:''},
+      {id:'p-kyocera-m2040', name:'Kyocera M2040dn', location:'Администрация', wh:'megapolis', serial:'—', notes:''},
+      {id:'p-brother-l2340', name:'Brother HL-L2340', location:'Администрация', wh:'megapolis', serial:'—', notes:''},
+    ],
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // Back-fill fields added after this browser's data was first saved, so an
+      // older localStorage snapshot doesn't crash newer views (e.g. printers,
+      // barcodes) or leave barcode lookups silently unable to match anything.
+      const fresh = defaultData();
+      if(!parsed.printers) parsed.printers = fresh.printers;
+      // Data saved before warehouses existed: everything it holds sits on the main warehouse.
+      if(!Array.isArray(parsed.warehouses) || !parsed.warehouses.length) parsed.warehouses = defaultWarehouses();
+      if(Array.isArray(parsed.cartridges)){
+        parsed.cartridges.forEach(c => {
+          if(!c.barcode){
+            const match = fresh.cartridges.find(x => x.id === c.id);
+            c.barcode = match ? match.barcode : '';
+          }
+          if(!c.branchStock) c.branchStock = {};
+          // Only toner and ink are tracked now, and colors come from a fixed list.
+          if(!TYPE_LABELS[c.type]) c.type = 'toner';
+          c.typeLabel = TYPE_LABELS[c.type];
+          c.color = normalizeColor(c.color);
+          c.colorHex = COLORS[c.color];
+        });
+      }
+      parsed.printers.forEach(p => { if(p.wh === undefined) p.wh = ''; });
+      return parsed;
+    }
+  }catch(e){}
+  return defaultData();
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+let state = loadState();
+let searchQuery = '';
+let activeFilter = 'all';
+let modalState = null;
+let toastTimer = null;
+let historyFilter = 'all';
+
+function emptyData(){
+  return {warehouses: defaultWarehouses(), cartridges: [], history: {}, activity: [], printers: []};
+}
+function resetData(mode){
+  const msg = mode === 'empty'
+    ? 'Удалить ВСЕ картриджи, принтеры и историю операций? Склады станут пустыми. Отменить это нельзя.'
+    : 'Заменить все текущие данные демонстрационными (11 примерных картриджей)? Ваши записи будут удалены.';
+  if(!confirm(msg)) return;
+  const keepWarehouses = (state.warehouses || []).filter(w => !w.deleted);
+  state = mode === 'empty' ? emptyData() : defaultData();
+  // Clearing wipes stock, not the list of branches the user set up.
+  if(mode === 'empty' && keepWarehouses.length) state.warehouses = keepWarehouses;
+  saveState();
+  toast(mode === 'empty' ? 'Склад очищен. Добавьте свои картриджи.' : 'Загружены демо-данные');
+  location.hash = mode === 'empty' ? '#/inventory' : '#/dashboard';
+  render();
+}
+
+const FILTERS = [
+  {key:'all', label:'Все'},
+  {key:'toner', label:'Тонер'},
+  {key:'ink', label:'Чернила'},
+  {key:'empty', label:'Нет в наличии'},
+];
+
+/* ---------- helpers ---------- */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function todayLabel(){
+  return new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+}
+function fmtDate(iso){
+  const [y,m,d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
+function daysAgoIso(n){
+  const d = new Date(); d.setDate(d.getDate()-n);
+  return d.toISOString().slice(0,10);
+}
+// Status is about the main warehouse only: either something is on the shelf or not.
+function statusOf(c){
+  if(c.stock > 0) return 'ok';
+  return c.onOrder ? 'order' : 'critical';
+}
+function statusMeta(status){
+  return {
+    ok:{label:'В наличии', cls:'pill-ok', bar:'var(--ok-dot)'},
+    critical:{label:'Нет в наличии', cls:'pill-critical', bar:'var(--crit-dot)'},
+    order:{label:'На заказе', cls:'pill-order', bar:'var(--order-dot)'},
+  }[status];
+}
+function plural(n, one, few, many){
+  const a = Math.abs(n) % 100, b = a % 10;
+  if(a > 10 && a < 20) return many;
+  if(b === 1) return one;
+  if(b >= 2 && b <= 4) return few;
+  return many;
+}
+
+/* ---------- warehouses ---------- */
+// Deleted branches stay in the list (flagged) so old history still shows their name.
+function activeWarehouses(){ return state.warehouses.filter(w => !w.deleted); }
+function branchList(){ return activeWarehouses().filter(w => w.id !== MAIN_WH); }
+function whName(id){
+  const w = state.warehouses.find(x => x.id === (id || MAIN_WH));
+  return w ? w.name : 'Склад удалён';
+}
+function whStock(c, wh){
+  if((wh || MAIN_WH) === MAIN_WH) return c.stock;
+  return (c.branchStock || {})[wh] || 0;
+}
+function setWhStock(c, wh, value){
+  if(wh === MAIN_WH){ c.stock = value; return; }
+  if(!c.branchStock) c.branchStock = {};
+  c.branchStock[wh] = value;
+}
+function totalStock(c){ return activeWarehouses().reduce((s,w) => s + whStock(c, w.id), 0); }
+function whTotal(wh){ return state.cartridges.reduce((s,c) => s + whStock(c, wh), 0); }
+function defaultIssueWh(){
+  const last = state.lastIssueWh;
+  return last && activeWarehouses().some(w => w.id === last) ? last : MAIN_WH;
+}
+// How one history entry changes each warehouse's stock, as {warehouseId: signedQty}.
+function entryDeltas(h){
+  if(h.type === 'receive') return {[h.wh || MAIN_WH]: h.qty};
+  if(h.type === 'issue') return {[h.wh || MAIN_WH]: -h.qty};
+  if(h.type === 'transfer') return {[h.from || MAIN_WH]: -h.qty, [h.to]: h.qty};
+  return {};
+}
+function opLabel(h){
+  if(h.type === 'receive') return (h.wh && h.wh !== MAIN_WH) ? `Приход · ${whName(h.wh)}` : 'Приход';
+  if(h.type === 'transfer') return `${whName(h.from)} → ${whName(h.to)}`;
+  return `Расход · ${whName(h.wh)}`;
+}
+function opSign(h){ return h.type === 'receive' ? '+' : h.type === 'issue' ? '−' : '→'; }
+function opColor(h){ return h.type === 'receive' ? 'var(--ok-fg)' : h.type === 'issue' ? 'var(--crit-fg)' : 'var(--order-fg)'; }
+
+function getHistory(c){
+  return state.history[c.id] || [];
+}
+function cartridgeSub(c){ return `${c.typeLabel} · ${c.color}`; }
+
+/* ---------- printers ---------- */
+// Issues remember the printer by id; the stored name keeps reports readable after a
+// printer is deleted, while a renamed printer shows its current name.
+function printerNameOf(h){
+  const p = h.printerId && state.printers.find(x => x.id === h.printerId);
+  return p ? p.name : (h.printerName || '');
+}
+function printerInstalls(printerId){
+  const list = [];
+  state.cartridges.forEach(c => getHistory(c).forEach(h => {
+    if(h.type === 'issue' && h.printerId === printerId) list.push({h, c});
+  }));
+  return list.sort((a,b) => b.h.date.localeCompare(a.h.date));
+}
+function estimateForecast(c, hist){
+  // Everything that leaves the main warehouse: its own installs plus hand-offs to branches.
+  const issues = hist.filter(h => (h.type === 'issue' && (h.wh || MAIN_WH) === MAIN_WH) || (h.type === 'transfer' && (h.from || MAIN_WH) === MAIN_WH));
+  if(issues.length < 2) return null;
+  const totalQty = issues.reduce((s,h) => s+h.qty, 0);
+  const newest = new Date(issues[0].date);
+  const oldest = new Date(issues[issues.length-1].date);
+  const spanDays = Math.max(1, Math.round((newest-oldest)/86400000));
+  const perUnitDays = Math.max(1, Math.round(spanDays/totalQty));
+  const days = c.stock > 0 ? Math.round(c.stock*perUnitDays) : 0;
+  return {perUnitDays, days};
+}
+
+/* ---------- toast ---------- */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ---------- row / card templates ---------- */
+function rowTemplate(c){
+  const st = statusOf(c);
+  const meta = statusMeta(st);
+  const inBranches = branchList().filter(w => whStock(c, w.id) > 0).map(w => `${w.name} ${whStock(c, w.id)}`);
+  return `
+  <div class="c-row" onclick="location.hash='#/detail/${c.id}'">
+    <div class="chip" style="background:${colorHexOf(c)}"></div>
+    <div class="c-main">
+      <div class="c-name">${escapeHtml(c.name)}${st === 'ok' ? '' : ` <span class="pill ${meta.cls}"><span class="pill-dot"></span>${meta.label}</span>`}</div>
+      <div class="c-sub">${escapeHtml(cartridgeSub(c))}</div>
+      ${inBranches.length ? `<div class="c-wh">В филиалах: ${escapeHtml(inBranches.join(' · '))}</div>` : ''}
+    </div>
+    <div class="c-stock"><b style="color:${st==='ok' ? 'var(--text)' : meta.bar}">${c.stock}</b><span>шт.</span></div>
+    <div class="c-quick">
+      <button class="q-btn q-in" title="Приход" aria-label="Приход ${escapeHtml(c.name)}" onclick="event.stopPropagation();openMovement('${c.id}','receive')">+</button>
+      <button class="q-btn q-out" title="Расход" aria-label="Расход ${escapeHtml(c.name)}" onclick="event.stopPropagation();openMovement('${c.id}','issue')">−</button>
+    </div>
+  </div>`;
+}
+
+function activityRowTemplate(a){
+  const m = String(a.text).match(/×(\d+)\s*$/);
+  const qty = m ? m[1] : '';
+  const name = String(a.text).replace(/\s*×\d+\s*$/, '');
+  const cls = a.type==='issue' ? 'act-out' : a.type==='receive' ? 'act-in' : 'act-order';
+  const sign = a.type==='issue' ? '−' : a.type==='receive' ? '+' : a.type==='transfer' ? '→' : '';
+  const prefix = a.type==='order' ? 'Заказ · ' : '';
+  return `
+  <div class="act-row">
+    <div class="act-badge ${cls}">${sign}${qty}</div>
+    <div style="min-width:0;flex-grow:1">
+      <div style="font-weight:700">${prefix}${escapeHtml(name)}</div>
+      <div style="color:var(--faint);font-size:13px;margin-top:2px">${escapeHtml(a.meta)} · ${escapeHtml(a.date)}</div>
+    </div>
+  </div>`;
+}
+
+function monthTotals(){
+  const prefix = new Date().toISOString().slice(0,7);
+  let inQty = 0, outQty = 0;
+  Object.values(state.history).forEach(list => list.forEach(h => {
+    if(!h.date.startsWith(prefix)) return;
+    if(h.type === 'receive') inQty += h.qty;
+    else if(h.type === 'issue') outQty += h.qty;
+  }));
+  return {inQty, outQty};
+}
+// This month's flows per warehouse: in = from supplier, got = received from another
+// warehouse, sent = handed to another warehouse, out = installed (расход).
+function monthFlows(){
+  const prefix = new Date().toISOString().slice(0,7);
+  const flows = {};
+  const f = id => flows[id] || (flows[id] = {in:0, got:0, sent:0, out:0});
+  Object.values(state.history).forEach(list => list.forEach(h => {
+    if(!h.date.startsWith(prefix)) return;
+    if(h.type === 'receive') f(h.wh || MAIN_WH).in += h.qty;
+    else if(h.type === 'issue') f(h.wh || MAIN_WH).out += h.qty;
+    else if(h.type === 'transfer'){ f(h.from || MAIN_WH).sent += h.qty; f(h.to).got += h.qty; }
+  }));
+  return f;
+}
+
+function warehouseCardsTemplate(){
+  const flow = monthFlows();
+  return `<div class="wh-grid">${activeWarehouses().map(w => {
+    const isMain = w.id === MAIN_WH;
+    const f = flow(w.id);
+    const total = whTotal(w.id);
+    const models = state.cartridges.filter(c => whStock(c, w.id) > 0).length;
+    const parts = [];
+    if(f.in) parts.push(`<span style="color:var(--ok-fg)">+${f.in} пришло</span>`);
+    if(f.got) parts.push(`<span style="color:var(--order-fg)">+${f.got} получено</span>`);
+    if(f.sent) parts.push(`<span style="color:var(--order-fg)">→${f.sent} ${isMain ? 'в филиалы' : 'передано'}</span>`);
+    if(f.out) parts.push(`<span style="color:var(--crit-fg)">−${f.out} расход</span>`);
+    return `
+    <a class="wh-card ${isMain ? 'wh-main' : ''}" href="#/warehouses/${w.id}">
+      <div class="wh-top"><span class="wh-name">${escapeHtml(w.name)}</span><span class="wh-tag">${isMain ? 'Основной' : 'Филиал'}</span></div>
+      <div class="wh-total">${total}<small>шт.</small></div>
+      <div class="wh-sub">${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</div>
+      <div class="wh-month">${parts.length ? 'За месяц: ' + parts.join(' · ') : 'За месяц движений нет'}</div>
+    </a>`;
+  }).join('')}</div>`;
+}
+
+function filterChipsTemplate(){
+  return FILTERS.map(f => {
+    let count;
+    if(f.key==='all') count = state.cartridges.length;
+    else if(f.key==='empty') count = state.cartridges.filter(c=>c.stock===0).length;
+    else count = state.cartridges.filter(c=>c.type===f.key).length;
+    return `<button class="filter-chip ${f.key===activeFilter?'active':''}" onclick="setFilter('${f.key}')">${f.label} · ${count}</button>`;
+  }).join('');
+}
+
+/* ---------- views ---------- */
+function renderDashboardView(){
+  const totalUnits = state.cartridges.reduce((s,c) => s + totalStock(c), 0);
+  const {inQty, outQty} = monthTotals();
+  const hasBranches = branchList().length > 0;
+  const need = state.cartridges.filter(c => c.stock === 0);
+
+  return `
+  <div class="topbar">
+    <div><h1>Главная</h1><p class="sub">${todayLabel()}</p></div>
+    <button class="btn-secondary" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
+  </div>
+  <div class="content">
+    <div class="big-actions ${hasBranches ? 'four' : ''}">
+      <button class="big-btn big-in" onclick="openMovement(null,'receive')">${ICONS.plus}Приход</button>
+      <button class="big-btn big-out" onclick="openMovement(null,'issue')">${ICONS.minus}Расход</button>
+      ${hasBranches ? `<button class="big-btn big-move" onclick="openMovement(null,'transfer')">${ICONS.transfer}В филиал</button>` : ''}
+      <button class="big-btn big-scan" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}<span>Сканировать<span class="desk-inline"> штрих-код</span></span></button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">На всех складах</div><div class="stat-value">${totalUnits}<small>шт.</small></div></div>
+      <div class="stat"><div class="stat-label">Пришло за месяц</div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div></div>
+      <div class="stat"><div class="stat-label">Расход за месяц</div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Склады</h2><a href="#/warehouses">Остатки по складам →</a></div>
+      ${warehouseCardsTemplate()}
+    </div>
+
+    ${!state.cartridges.length ? `
+    <div class="section">
+      <div class="row-list empty-state">
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>
+        Добавьте свои картриджи — после этого здесь появятся остатки и операции.
+        <div style="margin-top:16px"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div>
+      </div>
+    </div>` : `
+    <div class="section">
+      <div class="section-head"><h2>Закончились на ${escapeHtml(whName(MAIN_WH))}${need.length ? ' · ' + need.length : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
+      ${need.length ? `<div class="row-list">${need.map(rowTemplate).join('')}</div>` : `<div class="row-list empty-state">Все картриджи в наличии</div>`}
+    </div>`}
+
+    <div class="section">
+      <div class="section-head"><h2>Последние операции</h2><a href="#/history">Вся история →</a></div>
+      <div class="row-list">${state.activity.length ? state.activity.slice(0,6).map(activityRowTemplate).join('') : `<div class="empty-state">Пока нет операций</div>`}</div>
+    </div>
+  </div>`;
+}
+
+function renderInventoryView(){
+  return `
+  <div class="topbar">
+    <div><h1>Картриджи</h1><p class="sub">${state.cartridges.length} ${plural(state.cartridges.length, 'модель', 'модели', 'моделей')} · ${escapeHtml(whName(MAIN_WH))}: ${whTotal(MAIN_WH)} шт.${branchList().length ? ` · в филиалах: ${branchList().reduce((s,w) => s + whTotal(w.id), 0)} шт.` : ''}</p></div>
+    <div class="topbar-actions">
+      <div class="search-box">${ICONS.search}<input id="inv-search" placeholder="Название или штрих-код" value="${escapeHtml(searchQuery)}"></div>
+      <button class="icon-btn desk-only" title="Сканировать штрих-код" aria-label="Сканировать штрих-код" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}</button>
+      <button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="filter-row" id="filter-row">${filterChipsTemplate()}</div>
+    <div class="row-list" id="inv-list-body"></div>
+  </div>`;
+}
+
+function renderDetailView(id){
+  const c = state.cartridges.find(x => x.id === id);
+  if(!c){
+    return `<div class="content" style="padding-top:32px"><p>Картридж не найден. <a href="#/inventory">Вернуться к складу</a></p></div>`;
+  }
+  const st = statusOf(c);
+  const meta = statusMeta(st);
+  const hist = getHistory(c);
+  const forecast = estimateForecast(c, hist);
+
+  // Which printers this cartridge went into, most-used first.
+  const byPrinter = {};
+  hist.forEach(h => {
+    if(h.type !== 'issue') return;
+    const name = printerNameOf(h);
+    if(!name) return;
+    const e = byPrinter[name] || (byPrinter[name] = {qty:0, last:h.date});
+    e.qty += h.qty;
+    if(h.date > e.last) e.last = h.date;
+  });
+  const installed = Object.entries(byPrinter).sort((a,b) => b[1].qty - a[1].qty);
+
+  return `
+  <div class="content" style="padding-top:24px">
+    <a class="back-link" href="#/inventory">${ICONS.back} Все картриджи</a>
+    <div class="detail-head">
+      <div class="detail-title-row">
+        <div class="detail-chip" style="background:${colorHexOf(c)}"></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="font-size:22px">${escapeHtml(c.name)}</h1>${st === 'ok' ? '' : `<span class="pill ${meta.cls}"><span class="pill-dot"></span>${meta.label}</span>`}</div>
+          <div style="font-size:15px;color:var(--faint);margin-top:4px">${escapeHtml(cartridgeSub(c))}</div>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button class="icon-btn" title="Редактировать" onclick="openCartridgeEdit('${c.id}')">${ICONS.edit}</button>
+        <button class="btn-primary btn-in" onclick="openMovement('${c.id}','receive')">${ICONS.plus}Приход</button>
+        ${branchList().length ? `<button class="btn-primary btn-move" onclick="openMovement('${c.id}','transfer')">${ICONS.transfer}В филиал</button>` : ''}
+        <button class="btn-primary btn-out" onclick="openMovement('${c.id}','issue')">${ICONS.minus}Расход</button>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+        <div class="card" style="padding:20px">
+          <span class="field-label">Остатки по складам</span>
+          <div class="wh-mini">
+            ${activeWarehouses().map(w => `<a class="wh-mini-item" href="#/warehouses/${w.id}"><span>${escapeHtml(w.name)}</span><b>${whStock(c, w.id)}</b></a>`).join('')}
+            <div class="wh-mini-item wh-mini-total"><span>Всего</span><b>${totalStock(c)}</b></div>
+          </div>
+          ${forecast ? `<div class="insight"><div class="insight-icon">${ICONS.forecast}</div><div><div style="font-size:14px;font-weight:700;color:#5C3B0C">С ${escapeHtml(whName(MAIN_WH))} уходит ~1 шт. в ${forecast.perUnitDays} дн.</div><div style="font-size:13px;color:#8F5C0C">${c.stock > 0 ? `Остатка хватит примерно на ${forecast.days} дн.` : 'На складе уже пусто'}</div></div></div>` : ''}
+        </div>
+
+        <div class="card field-grid" style="padding:20px">
+          <div><span class="field-label">Тип</span><div class="field-value">${escapeHtml(c.typeLabel)}</div></div>
+          <div><span class="field-label">Цвет</span><div class="field-value" style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:4px;background:${colorHexOf(c)}"></span>${escapeHtml(c.color)}</div></div>
+          <div><span class="field-label">Штрих-код</span><div class="field-value mono">${escapeHtml(c.barcode || '—')}</div></div>
+          <div><span class="field-label">Поставщик</span><div class="field-value">${escapeHtml(c.supplier || '—')}</div></div>
+          <div><span class="field-label">Место хранения</span><div class="field-value">${escapeHtml(c.location || '—')}</div></div>
+        </div>
+
+        <div class="card" style="padding:20px">
+          <span class="field-label">Куда устанавливали</span>
+          ${installed.length
+            ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${installed.map(([name, e]) => `<span class="tag">${escapeHtml(name)} · ${e.qty} шт.</span>`).join('')}</div>`
+            : `<p style="font-size:14px;color:var(--faint);margin:8px 0 0">Пока нет. При расходе выберите принтер — он появится здесь и в отчёте по принтерам.</p>`}
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px">
+        <h2 style="margin-bottom:10px">История движений</h2>
+        <table>
+          <thead><tr><th>Дата</th><th>Операция</th><th style="text-align:right">Кол-во</th><th style="text-align:right">Остаток</th></tr></thead>
+          <tbody>${hist.length ? hist.slice(0,8).map(h => `<tr><td>${fmtDate(h.date)}</td><td>${escapeHtml(opLabel(h))}${printerNameOf(h) ? `<div class="t-sub">${escapeHtml(printerNameOf(h))}</div>` : ''}</td><td class="mono" style="text-align:right;color:${opColor(h)}">${opSign(h)}${h.qty}</td><td class="mono" style="text-align:right">${h.result}</td></tr>`).join('') : `<tr><td colspan="4" class="empty-state">Операций пока нет</td></tr>`}</tbody>
+        </table>
+        ${hist.length ? `<div style="margin-top:10px;font-size:12px;color:var(--faint)">Показаны последние ${Math.min(hist.length,8)} из ${hist.length}</div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function printerCardTemplate(p){
+  const installs = printerInstalls(p.id);
+  const month = new Date().toISOString().slice(0,7);
+  const monthQty = installs.filter(x => x.h.date.startsWith(month)).reduce((s,x) => s + x.h.qty, 0);
+  const totalQty = installs.reduce((s,x) => s + x.h.qty, 0);
+  const byCartridge = {};
+  installs.forEach(({h, c}) => { byCartridge[c.id] = byCartridge[c.id] || {c, qty:0}; byCartridge[c.id].qty += h.qty; });
+  const last = installs[0];
+  const sub = [p.location, p.serial && p.serial !== '—' ? 'с/н ' + p.serial : ''].filter(Boolean).join(' · ') || 'Место не указано';
+  return `
+  <div class="card" style="padding:16px 18px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+      <div style="display:flex;align-items:center;gap:12px;min-width:0">
+        <div class="icon-btn" style="background:var(--paper-2);flex-shrink:0">${ICONS.printer}</div>
+        <div style="min-width:0">
+          <div style="font-size:17px;font-weight:700">${escapeHtml(p.name)}</div>
+          <div style="font-size:13px;color:var(--faint)">${escapeHtml(sub)}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="icon-btn" style="width:40px;height:40px" title="Изменить" aria-label="Изменить принтер" onclick="openPrinterModal('${p.id}')">${ICONS.edit}</button>
+        <button class="icon-btn" style="width:40px;height:40px" title="Удалить" aria-label="Удалить принтер" onclick="deletePrinter('${p.id}')">${ICONS.trash}</button>
+      </div>
+    </div>
+    <div class="p-stats">
+      <div><span>За месяц</span><b>${monthQty}</b></div>
+      <div><span>Всего</span><b>${totalQty}</b></div>
+      <div class="p-wide"><span>Последняя установка</span><b class="p-last">${last ? `${fmtDate(last.h.date)} · ${escapeHtml(last.c.name)}` : '—'}</b></div>
+    </div>
+    ${totalQty ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${Object.values(byCartridge).sort((a,b) => b.qty - a.qty).map(({c, qty}) => `<a href="#/detail/${c.id}" class="tag" style="display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:${colorHexOf(c)}"></span>${escapeHtml(c.name)} · ${qty} шт.</a>`).join('')}</div>` : ''}
+  </div>`;
+}
+function renderPrintersView(){
+  const printers = [...state.printers].sort((a,b) => a.name.localeCompare(b.name));
+  // Group by the warehouse/branch the printer stands in.
+  const groups = activeWarehouses().map(w => ({title: w.name, list: printers.filter(p => p.wh === w.id)}));
+  groups.push({title: 'Склад не указан', list: printers.filter(p => !activeWarehouses().some(w => w.id === p.wh))});
+  const body = groups.filter(g => g.list.length).map(g => `
+    <div class="section">
+      <div class="section-head"><h2>${escapeHtml(g.title)} · ${g.list.length}</h2></div>
+      <div style="display:flex;flex-direction:column;gap:12px">${g.list.map(printerCardTemplate).join('')}</div>
+    </div>`).join('');
+
+  return `
+  <div class="topbar">
+    <div><h1>Принтеры</h1><p class="sub">${printers.length} ${plural(printers.length, 'принтер', 'принтера', 'принтеров')} · сколько картриджей куда установлено</p></div>
+    <div class="topbar-actions">
+      <button class="btn-secondary" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
+      <button class="btn-primary" onclick="openPrinterModal()">${ICONS.plus}Добавить принтер</button>
+    </div>
+  </div>
+  <div class="content">${body || `<div class="card empty-state">Принтеров пока нет — нажмите «Добавить принтер»</div>`}</div>`;
+}
+
+/* ---------- printer modal (add / edit) ---------- */
+let printerModalState = null;
+function openPrinterModal(id){
+  const p = id && state.printers.find(x => x.id === id);
+  printerModalState = p
+    ? {id: p.id, name: p.name, location: p.location || '', wh: p.wh || '', serial: p.serial === '—' ? '' : (p.serial || ''), notes: p.notes || ''}
+    : {id: null, name:'', location:'', wh: MAIN_WH, serial:'', notes:''};
+  renderPrinterModal();
+}
+function closePrinterModal(){
+  printerModalState = null;
+  const root = document.getElementById('modal-root');
+  if(root) root.innerHTML = '';
+}
+function renderPrinterModal(){
+  const root = document.getElementById('modal-root');
+  if(!printerModalState){ root.innerHTML = ''; return; }
+  const s = printerModalState;
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closePrinterModal()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div><h1>${s.id ? 'Изменить принтер' : 'Новый принтер'}</h1><p style="margin:4px 0 0;font-size:14px;color:var(--faint)">При расходе картриджа выбирайте принтер — так появится отчёт по принтерам</p></div>
+        <button class="icon-btn" aria-label="Закрыть" onclick="closePrinterModal()">${ICONS.x}</button>
+      </div>
+      <div class="field" style="margin-top:18px">
+        <span class="field-lbl">Принтер *</span>
+        <input class="input" value="${escapeHtml(s.name)}" oninput="printerModalState.name=this.value" placeholder="Например, HP LaserJet Pro M404dn">
+      </div>
+      <div class="field">
+        <span class="field-lbl">Где стоит (склад / филиал)</span>
+        <select class="input" onchange="printerModalState.wh=this.value">
+          ${activeWarehouses().map(w => `<option value="${w.id}" ${w.id===s.wh?'selected':''}>${escapeHtml(w.name)}</option>`).join('')}
+          <option value="" ${activeWarehouses().some(w => w.id === s.wh) ? '' : 'selected'}>Не указан</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:180px">
+          <span class="field-lbl">Отдел / кабинет</span>
+          <input class="input" value="${escapeHtml(s.location)}" oninput="printerModalState.location=this.value" placeholder="Например, Бухгалтерия">
+        </div>
+        <div class="field" style="flex:1;min-width:180px">
+          <span class="field-lbl">Серийный номер</span>
+          <div style="display:flex;gap:8px">
+            <input class="input" style="flex:1;min-width:0" value="${escapeHtml(s.serial)}" oninput="printerModalState.serial=this.value" placeholder="Необязательно">
+            <button class="icon-btn" title="Сканировать штрих-код" onclick="openScanner(onBarcodeScannedForPrinter)">${ICONS.barcode}</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-lbl">Комментарий</span>
+        <textarea class="input" rows="2" placeholder="Необязательно" oninput="printerModalState.notes=this.value">${escapeHtml(s.notes)}</textarea>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="closePrinterModal()">Отмена</button>
+        <button class="btn-primary" onclick="submitPrinter()">${ICONS.check}${s.id ? 'Сохранить' : 'Добавить принтер'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function submitPrinter(){
+  const s = printerModalState;
+  if(!s) return;
+  const name = s.name.trim();
+  if(!name){ toast('Укажите принтер'); return; }
+  if(state.printers.some(p => p.id !== s.id && p.name.toLowerCase() === name.toLowerCase())){
+    toast('Такой принтер уже есть в списке');
+    return;
+  }
+  const fields = {name, location: s.location.trim(), wh: s.wh, serial: s.serial.trim() || '—', notes: s.notes.trim()};
+  if(s.id){
+    Object.assign(state.printers.find(p => p.id === s.id), fields);
+  } else {
+    const id = 'p-' + name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6);
+    state.printers.push({id, ...fields});
+  }
+  saveState();
+  closePrinterModal();
+  toast(s.id ? `Сохранено: ${name}` : `Принтер добавлен: ${name}`);
+  render();
+}
+function deletePrinter(id){
+  const p = state.printers.find(x => x.id === id);
+  if(!p) return;
+  if(!confirm(`Удалить «${p.name}»? Записи о том, какие картриджи в него ставили, останутся в истории и отчётах.`)) return;
+  state.printers = state.printers.filter(x => x.id !== id);
+  saveState();
+  toast('Принтер удалён');
+  render();
+}
+
+function renderSuppliersView(){
+  const bySupplier = {};
+  state.cartridges.forEach(c => {
+    if(!bySupplier[c.supplier]) bySupplier[c.supplier] = {items:[], stock:0};
+    const s = bySupplier[c.supplier];
+    s.items.push(c);
+    s.stock += c.stock;
+  });
+  const names = Object.keys(bySupplier).sort((a,b) => bySupplier[b].stock - bySupplier[a].stock);
+
+  const cards = names.map(name => {
+    const s = bySupplier[name];
+    return `
+    <div class="card" style="padding:18px 20px">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px">
+        <div class="icon-btn" style="background:var(--paper-2)">${ICONS.truck}</div>
+        <div><div style="font-size:14.5px;font-weight:600">${escapeHtml(name)}</div><div style="font-size:12px;color:var(--faint)">${s.items.length} моделей · ${s.stock} шт. на складе</div></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${s.items.map(c => `<a href="#/detail/${c.id}" class="tag" style="color:var(--text)">${escapeHtml(c.name)}</a>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="topbar"><div><h1>Поставщики</h1><p class="sub">${names.length} поставщиков</p></div></div>
+  <div class="content"><div style="display:flex;flex-direction:column;gap:14px">${cards || `<div class="card empty-state">Нет данных о поставщиках</div>`}</div></div>`;
+}
+
+function historyFilterChipsTemplate(){
+  const all = [];
+  state.cartridges.forEach(c => getHistory(c).forEach(h => all.push(h)));
+  const counts = {
+    all: all.length,
+    receive: all.filter(h=>h.type==='receive').length,
+    transfer: all.filter(h=>h.type==='transfer').length,
+    issue: all.filter(h=>h.type==='issue').length,
+  };
+  const labels = {all:'Все', receive:'Приход', transfer:'В филиалы', issue:'Расход'};
+  return Object.keys(labels).map(k => `<button class="filter-chip ${k===historyFilter?'active':''}" onclick="setHistoryFilter('${k}')">${labels[k]} · ${counts[k]}</button>`).join('');
+}
+function setHistoryFilter(key){
+  historyFilter = key;
+  const row = document.getElementById('history-filter-row');
+  if(row) row.innerHTML = historyFilterChipsTemplate();
+  updateHistoryList();
+}
+function updateHistoryList(){
+  let rows = [];
+  state.cartridges.forEach(c => getHistory(c).forEach(h => rows.push({...h, cartridgeName:c.name, cartridgeId:c.id, colorHex:colorHexOf(c)})));
+  if(historyFilter !== 'all') rows = rows.filter(r => r.type === historyFilter);
+  rows.sort((a,b) => b.date.localeCompare(a.date));
+  const body = document.getElementById('history-body');
+  if(!body) return;
+  body.innerHTML = rows.length ? rows.map(r => `
+    <tr style="cursor:pointer" onclick="location.hash='#/detail/${r.cartridgeId}'">
+      <td class="mono">${fmtDate(r.date)}</td>
+      <td><span style="display:inline-flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:3px;background:${r.colorHex};flex-shrink:0"></span>${escapeHtml(r.cartridgeName)}</span></td>
+      <td>${escapeHtml(opLabel(r))}</td>
+      <td class="mono" style="text-align:right;color:${opColor(r)}">${opSign(r)}${r.qty}</td>
+      <td class="mono" style="text-align:right">${r.result}</td>
+      <td style="color:var(--faint)">${escapeHtml([printerNameOf(r), r.who !== '—' ? r.who : ''].filter(Boolean).join(' · ') || '—')}</td>
+    </tr>`).join('') : `<tr><td colspan="6" class="empty-state">Операций не найдено</td></tr>`;
+}
+function renderHistoryView(){
+  return `
+  <div class="topbar">
+    <div><h1>История</h1><p class="sub">Приходы, передачи в филиалы и расходы</p></div>
+    <button class="btn-primary btn-in" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
+  </div>
+  <div class="content">
+    <div class="filter-row" id="history-filter-row">${historyFilterChipsTemplate()}</div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>Дата</th><th>Картридж</th><th>Операция</th><th style="text-align:right">Кол-во</th><th style="text-align:right">Остаток</th><th>Принтер / кто</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---------- warehouses views ---------- */
+function renderWarehousesView(){
+  const whs = activeWarehouses();
+  const list = [...state.cartridges].sort((a,b) => totalStock(b) - totalStock(a) || a.name.localeCompare(b.name));
+  const grand = list.reduce((s,c) => s + totalStock(c), 0);
+  return `
+  <div class="topbar">
+    <div><h1>Склады</h1><p class="sub">${escapeHtml(whName(MAIN_WH))} — основной склад, остальные — филиалы</p></div>
+    <button class="btn-secondary" onclick="addBranch()">${ICONS.plus}Добавить филиал</button>
+  </div>
+  <div class="content">
+    <div class="section">${warehouseCardsTemplate()}</div>
+    <div class="section">
+      <div class="section-head"><h2>Остатки по складам</h2></div>
+      <div class="card table-wrap">
+        <table class="wh-table">
+          <thead><tr><th>Картридж</th>${whs.map(w => `<th class="num">${escapeHtml(w.name)}</th>`).join('')}<th class="num">Всего</th></tr></thead>
+          <tbody>${list.length ? list.map(c => `
+            <tr style="cursor:pointer" onclick="location.hash='#/detail/${c.id}'">
+              <td><span style="display:inline-flex;align-items:center;gap:8px"><span style="width:9px;height:9px;border-radius:3px;background:${colorHexOf(c)};flex-shrink:0"></span>${escapeHtml(c.name)}</span></td>
+              ${whs.map(w => { const v = whStock(c, w.id); return `<td class="num mono ${v ? '' : 'zero'}">${v}</td>`; }).join('')}
+              <td class="num mono"><b>${totalStock(c)}</b></td>
+            </tr>`).join('') : `<tr><td colspan="${whs.length + 2}" class="empty-state">Картриджей пока нет</td></tr>`}</tbody>
+          ${list.length ? `<tfoot><tr><td>Итого</td>${whs.map(w => `<td class="num mono">${whTotal(w.id)}</td>`).join('')}<td class="num mono">${grand}</td></tr></tfoot>` : ''}
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function whRowTemplate(c, wh){
+  const n = whStock(c, wh);
+  const isMain = wh === MAIN_WH;
+  const plusAction = isMain ? `openMovement('${c.id}','receive')` : `openMovement('${c.id}','transfer',{to:'${wh}'})`;
+  return `
+  <div class="c-row ${n ? '' : 'c-row-empty'}" onclick="location.hash='#/detail/${c.id}'">
+    <div class="chip" style="background:${colorHexOf(c)}"></div>
+    <div class="c-main">
+      <div class="c-name">${escapeHtml(c.name)}</div>
+      <div class="c-sub">${escapeHtml(cartridgeSub(c))}</div>
+    </div>
+    <div class="c-stock"><b>${n}</b><span>шт.</span></div>
+    <div class="c-quick">
+      <button class="q-btn ${isMain ? 'q-in' : 'q-move'}" title="${isMain ? 'Приход' : 'Получить с ' + escapeHtml(whName(MAIN_WH))}" onclick="event.stopPropagation();${plusAction}">+</button>
+      <button class="q-btn q-out" title="Расход" onclick="event.stopPropagation();openMovement('${c.id}','issue',{wh:'${wh}'})">−</button>
+    </div>
+  </div>`;
+}
+
+function renderWarehouseView(id){
+  const w = activeWarehouses().find(x => x.id === id);
+  if(!w) return `<div class="content" style="padding-top:32px"><p>Склад не найден. <a href="#/warehouses">Все склады</a></p></div>`;
+  const isMain = w.id === MAIN_WH;
+  const total = whTotal(w.id);
+  const models = state.cartridges.filter(c => whStock(c, w.id) > 0).length;
+  const list = [...state.cartridges].sort((a,b) => whStock(b, w.id) - whStock(a, w.id) || a.name.localeCompare(b.name));
+  return `
+  <div class="content" style="padding-top:24px">
+    <a class="back-link" href="#/warehouses">${ICONS.back} Все склады</a>
+    <div class="detail-head">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="font-size:26px">${escapeHtml(w.name)}</h1><span class="wh-tag ${isMain ? 'wh-tag-main' : ''}">${isMain ? 'Основной склад' : 'Филиал'}</span></div>
+        <p style="margin:4px 0 0;font-size:15px;color:var(--faint)">${total} шт. · ${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</p>
+      </div>
+      <div class="detail-actions">
+        <button class="icon-btn" title="Переименовать" aria-label="Переименовать склад" onclick="renameWarehouse('${w.id}')">${ICONS.edit}</button>
+        ${isMain ? '' : `<button class="icon-btn" title="Удалить филиал" aria-label="Удалить филиал" onclick="deleteWarehouse('${w.id}')">${ICONS.trash}</button>`}
+        ${isMain
+          ? `<button class="btn-primary btn-in" onclick="openMovement(null,'receive')">${ICONS.plus}Приход</button>`
+          : `<button class="btn-primary btn-move" onclick="openMovement(null,'transfer',{to:'${w.id}'})">${ICONS.transfer}Получить с ${escapeHtml(whName(MAIN_WH))}</button>`}
+        <button class="btn-primary btn-out" onclick="openMovement(null,'issue',{wh:'${w.id}'})">${ICONS.minus}Расход</button>
+      </div>
+    </div>
+    <div class="row-list">${list.length ? list.map(c => whRowTemplate(c, w.id)).join('') : `<div class="empty-state">Картриджей пока нет</div>`}</div>
+  </div>`;
+}
+
+function addBranch(){
+  const name = (prompt('Название нового филиала:') || '').trim();
+  if(!name) return;
+  if(activeWarehouses().some(w => w.name.toLowerCase() === name.toLowerCase())){ toast('Склад с таким названием уже есть'); return; }
+  state.warehouses.push({id: 'wh-' + Math.random().toString(36).slice(2,8), name});
+  saveState();
+  toast(`Филиал добавлен: ${name}`);
+  render();
+}
+function renameWarehouse(id){
+  const w = activeWarehouses().find(x => x.id === id);
+  if(!w) return;
+  const name = (prompt('Новое название склада:', w.name) || '').trim();
+  if(!name || name === w.name) return;
+  if(activeWarehouses().some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())){ toast('Склад с таким названием уже есть'); return; }
+  w.name = name;
+  saveState();
+  toast('Склад переименован');
+  render();
+}
+function deleteWarehouse(id){
+  const w = activeWarehouses().find(x => x.id === id);
+  if(!w || id === MAIN_WH) return;
+  const left = whTotal(id);
+  if(left > 0){ toast(`На «${w.name}» ещё ${left} шт. — сначала спишите или передайте их`); return; }
+  if(!confirm(`Удалить филиал «${w.name}»? История операций по нему сохранится.`)) return;
+  w.deleted = true;
+  if(state.lastIssueWh === id) delete state.lastIssueWh;
+  saveState();
+  toast('Филиал удалён');
+  location.hash = '#/warehouses';
+}
+
+function renderSettingsView(){
+  return `
+  <div class="topbar"><div><h1>Настройки</h1><p class="sub">Данные приложения</p></div></div>
+  <div class="content">
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:520px">
+      <div class="row-list mob-only">
+        <a class="menu-link" href="#/warehouses">${ICONS.store}Склады и филиалы</a>
+        <a class="menu-link" href="#/printers">${ICONS.printer}Принтеры</a>
+        <a class="menu-link" href="#/suppliers">${ICONS.truck}Поставщики</a>
+      </div>
+      <div class="card" style="padding:22px">
+        <h2 style="font-size:20px;margin-bottom:8px">Начать с нуля</h2>
+        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Удаляет все картриджи, принтеры и историю. Склад станет пустым — дальше добавляйте свои картриджи кнопкой «Новый картридж» на складе.</p>
+        <button class="btn-primary btn-out" onclick="resetData('empty')">${ICONS.trash} Очистить всё</button>
+      </div>
+      <div class="card" style="padding:22px">
+        <h2 style="font-size:20px;margin-bottom:8px">Демо-данные</h2>
+        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Заменяет всё на 12 примерных картриджей — чтобы посмотреть, как работает приложение.</p>
+        <button class="btn-secondary" onclick="resetData('demo')">Загрузить демо-данные</button>
+      </div>
+      <p style="font-size:14px;color:var(--faint);margin:0">Данные хранятся только в этом браузере на этом устройстве.</p>
+    </div>
+  </div>`;
+}
+
+/* ---------- inventory list update (partial re-render, keeps input focus) ---------- */
+function updateInventoryList(){
+  let list = state.cartridges.filter(c => {
+    if(activeFilter==='empty') return c.stock===0;
+    if(activeFilter!=='all') return c.type===activeFilter;
+    return true;
+  });
+  if(searchQuery.trim()){
+    const q = searchQuery.trim().toLowerCase();
+    list = list.filter(c => c.name.toLowerCase().includes(q) || (c.barcode || '').includes(q));
+  }
+  const body = document.getElementById('inv-list-body');
+  if(!body) return;
+  if(!state.cartridges.length){
+    body.innerHTML = `<div class="empty-state"><div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>Добавьте первый картридж — вручную или отсканируйте штрих-код.<div style="margin-top:16px"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div></div>`;
+    return;
+  }
+  body.innerHTML = list.length ? list.map(rowTemplate).join('') : `<div class="empty-state">Ничего не найдено</div>`;
+}
+function setFilter(key){
+  activeFilter = key;
+  const row = document.getElementById('filter-row');
+  if(row) row.innerHTML = filterChipsTemplate();
+  updateInventoryList();
+}
+
+/* ---------- movement modal ---------- */
+// type: 'receive' (supplier → main), 'issue' (расход from any warehouse),
+// 'transfer' (one warehouse → another, normally main → branch).
+// opts: {wh} source for issue, {from, to} for transfer.
+function openMovement(id, type, opts){
+  if(!state.cartridges.length){
+    toast('Склад пуст — сначала добавьте картридж');
+    openCartridgeCreate();
+    return;
+  }
+  opts = opts || {};
+  const c = (id && state.cartridges.find(x=>x.id===id)) || state.cartridges[0];
+  let t = type || 'receive';
+  const branches = branchList();
+  if(t === 'transfer' && !branches.length){
+    toast('Филиалов нет — добавьте их в разделе «Склады»');
+    t = 'issue';
+  }
+  const from = opts.from || MAIN_WH;
+  let to = opts.to || (branches[0] ? branches[0].id : null);
+  if(to === from) to = (activeWarehouses().find(w => w.id !== from) || {}).id || null;
+  modalState = {
+    cartridgeId: c.id,
+    type: t,
+    qty: t==='receive' ? 10 : 1,
+    party: t==='receive' ? c.supplier : '',
+    note: '',
+    wh: opts.wh || defaultIssueWh(),
+    printerId: '',
+    from, to,
+  };
+  renderModal();
+}
+function setMovementPrinter(id){
+  if(!modalState) return;
+  modalState.printerId = id;
+  // A printer standing in a branch is fed from that branch's shelf.
+  const p = state.printers.find(x => x.id === id);
+  if(p && activeWarehouses().some(w => w.id === p.wh)) modalState.wh = p.wh;
+  renderModal();
+}
+function printerOptionsTemplate(selectedId){
+  const printers = [...state.printers].sort((a,b) => a.name.localeCompare(b.name));
+  const opt = p => `<option value="${p.id}" ${p.id===selectedId?'selected':''}>${escapeHtml(p.name)}${p.location ? ' — ' + escapeHtml(p.location) : ''}</option>`;
+  const groups = activeWarehouses().map(w => ({label: w.name, list: printers.filter(p => p.wh === w.id)}));
+  const rest = printers.filter(p => !activeWarehouses().some(w => w.id === p.wh));
+  return `<option value="">— не указан —</option>`
+    + groups.filter(g => g.list.length).map(g => `<optgroup label="${escapeHtml(g.label)}">${g.list.map(opt).join('')}</optgroup>`).join('')
+    + (rest.length ? `<optgroup label="Склад не указан">${rest.map(opt).join('')}</optgroup>` : '');
+}
+function closeMovement(){
+  modalState = null;
+  const root = document.getElementById('modal-root');
+  if(root) root.innerHTML = '';
+}
+function setMovementType(type){
+  if(!modalState) return;
+  modalState.type = type;
+  modalState.qty = type==='receive' ? 10 : 1;
+  const c = state.cartridges.find(x=>x.id===modalState.cartridgeId);
+  modalState.party = type==='receive' ? (c ? c.supplier : '') : '';
+  renderModal();
+}
+function setMovementWh(field, id){
+  if(!modalState) return;
+  modalState[field] = id;
+  // Source and destination of a transfer can never be the same warehouse.
+  if(field === 'from' && modalState.to === id) modalState.to = (activeWarehouses().find(w => w.id !== id) || {}).id || null;
+  renderModal();
+}
+function setMovementCartridge(id){
+  if(!modalState) return;
+  modalState.cartridgeId = id;
+  const c = state.cartridges.find(x=>x.id===id);
+  if(modalState.type==='receive') modalState.party = c ? c.supplier : '';
+  renderModal();
+}
+function stepMovementQty(delta){
+  if(!modalState) return;
+  modalState.qty = Math.max(1, modalState.qty + delta);
+  renderModal();
+}
+function renderModal(){
+  const root = document.getElementById('modal-root');
+  if(!modalState){ root.innerHTML = ''; return; }
+  const c = state.cartridges.find(x => x.id === modalState.cartridgeId) || state.cartridges[0];
+  const t = modalState.type;
+  const qty = modalState.qty;
+  const hasBranches = branchList().length > 0;
+  // The warehouse whose count the cartridge dropdown shows.
+  const shownWh = t === 'receive' ? MAIN_WH : t === 'issue' ? modalState.wh : modalState.from;
+  const whChips = (field, list) => `<div class="wh-chips">${list.map(w => `<button class="filter-chip ${modalState[field]===w.id?'active':''}" onclick="setMovementWh('${field}','${w.id}')">${escapeHtml(w.name)} · ${whStock(c, w.id)} шт.</button>`).join('')}</div>`;
+
+  let whFields = '', summary, title, submitLabel, btnCls;
+  if(t === 'receive'){
+    title = 'Приход картриджа';
+    submitLabel = 'Сохранить приход'; btnCls = 'btn-in';
+    summary = `${escapeHtml(whName(MAIN_WH))}: ${c.stock} → ${c.stock + qty} шт.`;
+  } else if(t === 'issue'){
+    const have = whStock(c, modalState.wh);
+    title = 'Расход картриджа';
+    submitLabel = 'Сохранить расход'; btnCls = 'btn-out';
+    if(hasBranches) whFields = `<div class="field"><span class="field-lbl">Со склада</span>${whChips('wh', activeWarehouses())}</div>`;
+    whFields += `
+      <div class="field">
+        <span class="field-lbl">В какой принтер</span>
+        <div style="display:flex;gap:8px">
+          <select class="input" style="flex:1;min-width:0" onchange="setMovementPrinter(this.value)">${printerOptionsTemplate(modalState.printerId)}</select>
+          <button class="icon-btn" title="Сканировать серийный номер принтера" onclick="openScanner(onBarcodeScannedPrinterInModal)">${ICONS.barcode}</button>
+        </div>
+      </div>`;
+    summary = `${escapeHtml(whName(modalState.wh))}: ${have} → ${Math.max(0, have - qty)} шт.`;
+  } else {
+    const have = whStock(c, modalState.from);
+    const moved = Math.min(qty, have);
+    const toHave = whStock(c, modalState.to);
+    title = modalState.from === MAIN_WH ? 'Передача в филиал' : 'Перемещение между складами';
+    submitLabel = 'Передать'; btnCls = 'btn-move';
+    whFields = `
+      <div class="field"><span class="field-lbl">Откуда</span>${whChips('from', activeWarehouses())}</div>
+      <div class="field"><span class="field-lbl">Куда</span>${whChips('to', activeWarehouses().filter(w => w.id !== modalState.from))}</div>`;
+    summary = `${escapeHtml(whName(modalState.from))}: ${have} → ${have - moved} шт.<br>${escapeHtml(whName(modalState.to))}: ${toHave} → ${toHave + moved} шт.`;
+  }
+  const partyLabel = t === 'receive' ? 'От кого (поставщик)' : t === 'issue' ? 'Кто установил' : 'Кто принял';
+  const partyHint = t === 'receive' ? 'Название поставщика' : 'Необязательно';
+
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closeMovement()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1>${title}</h1>
+        <button class="icon-btn" aria-label="Закрыть" onclick="closeMovement()">${ICONS.x}</button>
+      </div>
+      <div class="toggle ${hasBranches ? 'three' : ''}">
+        <button class="toggle-opt in ${t==='receive'?'active':''}" onclick="setMovementType('receive')">+ Приход</button>
+        ${hasBranches ? `<button class="toggle-opt move ${t==='transfer'?'active':''}" onclick="setMovementType('transfer')">→ В филиал</button>` : ''}
+        <button class="toggle-opt out ${t==='issue'?'active':''}" onclick="setMovementType('issue')">− Расход</button>
+      </div>
+      <div class="field">
+        <span class="field-lbl">Картридж</span>
+        <div style="display:flex;gap:8px">
+          <select class="input" style="flex:1;min-width:0" onchange="setMovementCartridge(this.value)">
+            ${state.cartridges.map(x => `<option value="${x.id}" ${x.id===c.id?'selected':''}>${escapeHtml(x.name)} (${whStock(x, shownWh)} шт.)</option>`).join('')}
+          </select>
+          <button class="icon-btn" title="Сканировать штрих-код" onclick="openScanner(onBarcodeScannedInModal)">${ICONS.barcode}</button>
+        </div>
+      </div>
+      ${whFields}
+      <div class="field">
+        <span class="field-lbl">Количество</span>
+        <div class="stepper"><button aria-label="Меньше" onclick="stepMovementQty(-1)">−</button><span class="val">${qty}</span><button aria-label="Больше" onclick="stepMovementQty(1)">+</button></div>
+      </div>
+      <div class="field">
+        <span class="field-lbl">${partyLabel}</span>
+        <input class="input" value="${escapeHtml(modalState.party)}" oninput="modalState.party=this.value" placeholder="${partyHint}">
+      </div>
+      <div class="field">
+        <span class="field-lbl">Комментарий</span>
+        <textarea class="input" rows="2" placeholder="Необязательно" oninput="modalState.note=this.value">${escapeHtml(modalState.note||'')}</textarea>
+      </div>
+      <div class="warn-box"><span>Станет: <b style="color:var(--text);font-size:17px;line-height:1.5">${summary}</b></span></div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="closeMovement()">Отмена</button>
+        <button class="btn-primary ${btnCls}" onclick="submitMovement()">${ICONS.check}${submitLabel}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function submitMovement(){
+  if(!modalState) return;
+  const c = state.cartridges.find(x => x.id === modalState.cartridgeId);
+  const t = modalState.type;
+  if(modalState.qty < 1){ toast('Укажите количество больше нуля'); return; }
+  const who = modalState.party.trim() || '—';
+  const note = (modalState.note || '').trim();
+  let qty = modalState.qty, entry, message, meta;
+
+  if(t === 'receive'){
+    c.stock += qty;
+    if(c.onOrder) c.onOrder = false;
+    entry = {type:'receive', wh:MAIN_WH, qty, result:c.stock};
+    message = `Приход записан: ${c.name} +${qty}`;
+    meta = modalState.party.trim() || 'Приход';
+  } else {
+    const src = t === 'issue' ? modalState.wh : modalState.from;
+    const dst = modalState.to;
+    if(t === 'transfer' && (!dst || dst === src)){ toast('Выберите, куда передать'); return; }
+    const have = whStock(c, src);
+    if(have === 0){ toast(`На складе «${whName(src)}» нет «${c.name}»`); return; }
+    if(qty > have){
+      if(!confirm(`На складе «${whName(src)}» только ${have} шт. ${t === 'issue' ? 'Списать' : 'Передать'} всё, что есть?`)) return;
+      // Record what actually left the shelf, so reports never count more than existed.
+      qty = have;
+    }
+    setWhStock(c, src, have - qty);
+    if(t === 'issue'){
+      state.lastIssueWh = src;
+      const printer = state.printers.find(p => p.id === modalState.printerId);
+      entry = {type:'issue', wh:src, qty, result: have - qty};
+      if(printer) Object.assign(entry, {printerId: printer.id, printerName: printer.name});
+      message = `Расход записан (${whName(src)}): ${c.name} −${qty}`;
+      meta = [whName(src), printer ? printer.name : '', modalState.party.trim()].filter(Boolean).join(' · ');
+    } else {
+      const toHave = whStock(c, dst);
+      setWhStock(c, dst, toHave + qty);
+      entry = {type:'transfer', from:src, to:dst, qty, result: have - qty, resultTo: toHave + qty};
+      message = `Передано: ${c.name} ×${qty} → ${whName(dst)}`;
+      meta = `${whName(src)} → ${whName(dst)}`;
+    }
+  }
+
+  Object.assign(entry, {date: todayIso(), who, dept: note});
+  if(!state.history[c.id]) state.history[c.id] = [];
+  state.history[c.id].unshift(entry);
+
+  state.activity.unshift({date: 'только что', type: t, text: `${c.name} ×${qty}`, meta});
+  state.activity = state.activity.slice(0,8);
+
+  saveState();
+  closeMovement();
+  toast(message);
+  render();
+}
+
+/* ---------- edit / delete cartridge ---------- */
+let cartridgeEditState = null;
+
+function openCartridgeCreate(barcode){
+  cartridgeEditState = {
+    isNew: true, id: null,
+    name: '', barcode: barcode || '',
+    type: 'toner', color: 'Чёрный',
+    supplier: '', location: '',
+    initialStock: 0,
+  };
+  renderCartridgeEditModal();
+}
+function openCartridgeEdit(id){
+  const c = state.cartridges.find(x => x.id === id);
+  if(!c) return;
+  cartridgeEditState = {
+    isNew: false, id: c.id,
+    name: c.name, barcode: c.barcode || '',
+    type: TYPE_LABELS[c.type] ? c.type : 'toner', color: normalizeColor(c.color),
+    supplier: c.supplier || '', location: c.location || '',
+  };
+  renderCartridgeEditModal();
+}
+function closeCartridgeEdit(){
+  cartridgeEditState = null;
+  document.getElementById('modal-root').innerHTML = '';
+}
+function setCartridgeEditField(field, value){
+  if(cartridgeEditState) cartridgeEditState[field] = value;
+}
+function pickCartridgeOption(field, value){
+  if(!cartridgeEditState) return;
+  cartridgeEditState[field] = value;
+  renderCartridgeEditModal();
+}
+function onBarcodeScannedForCartridgeEdit(code){
+  if(cartridgeEditState) cartridgeEditState.barcode = String(code).trim();
+  renderCartridgeEditModal();
+  toast('Штрих-код считан');
+}
+function renderCartridgeEditModal(){
+  const root = document.getElementById('modal-root');
+  const s = cartridgeEditState;
+  if(!s){ root.innerHTML = ''; return; }
+  const typeBtn = t => `<button class="filter-chip ${s.type===t?'active':''}" onclick="pickCartridgeOption('type','${t}')">${TYPE_LABELS[t]}</button>`;
+  const colorBtn = name => `<button class="filter-chip color-chip ${s.color===name?'active':''}" onclick="pickCartridgeOption('color','${name}')"><span class="color-dot" style="background:${COLORS[name]}"></span>${name}</button>`;
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closeCartridgeEdit()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div><h1>${s.isNew ? 'Новый картридж' : 'Редактировать картридж'}</h1><p style="margin:4px 0 0;font-size:14px;color:var(--faint)">${s.isNew ? 'Обязательно только название' : 'Остаток меняется через «Приход» и «Расход»'}</p></div>
+        <button class="icon-btn" aria-label="Закрыть" onclick="closeCartridgeEdit()">${ICONS.x}</button>
+      </div>
+
+      <div class="field" style="margin-top:16px">
+        <span class="field-lbl">Название *</span>
+        <input class="input" value="${escapeHtml(s.name)}" oninput="setCartridgeEditField('name', this.value)" placeholder="Например, HP CF283A">
+      </div>
+
+      <div class="field">
+        <span class="field-lbl">Штрих-код</span>
+        <div style="display:flex;gap:8px">
+          <input class="input" style="flex:1;min-width:0" value="${escapeHtml(s.barcode)}" oninput="setCartridgeEditField('barcode', this.value)">
+          <button class="icon-btn" title="Сканировать" onclick="openScanner(onBarcodeScannedForCartridgeEdit)">${ICONS.barcode}</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-lbl">Тип</span>
+        <div class="wh-chips">${Object.keys(TYPE_LABELS).map(typeBtn).join('')}</div>
+      </div>
+
+      <div class="field">
+        <span class="field-lbl">Цвет</span>
+        <div class="wh-chips">${Object.keys(COLORS).map(colorBtn).join('')}</div>
+      </div>
+
+      ${s.isNew ? `
+      <div class="field">
+        <span class="field-lbl">Сейчас на складе ${escapeHtml(whName(MAIN_WH))}, шт.</span>
+        <input class="input" type="number" min="0" inputmode="numeric" value="${s.initialStock}" oninput="setCartridgeEditField('initialStock', Math.max(0, Math.floor(Number(this.value)||0)))">
+      </div>` : ''}
+
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:180px">
+          <span class="field-lbl">Поставщик</span>
+          <input class="input" value="${escapeHtml(s.supplier)}" oninput="setCartridgeEditField('supplier', this.value)" placeholder="Необязательно">
+        </div>
+        <div class="field" style="flex:1;min-width:180px">
+          <span class="field-lbl">Место хранения</span>
+          <input class="input" value="${escapeHtml(s.location)}" oninput="setCartridgeEditField('location', this.value)" placeholder="Например, Стеллаж А-12">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">
+        ${s.isNew ? '' : `<button class="btn-secondary" style="color:var(--crit-fg)" onclick="deleteCartridge('${s.id}')">${ICONS.trash} Удалить</button>`}
+        <div style="flex-grow:1"></div>
+        <button class="btn-secondary" onclick="closeCartridgeEdit()">Отмена</button>
+        <button class="btn-primary" onclick="submitCartridgeEdit()">${ICONS.check}${s.isNew ? 'Добавить картридж' : 'Сохранить'}</button>
+      </div>
+    </div>
+  </div>`;
+}
+function submitCartridgeEdit(){
+  const s = cartridgeEditState;
+  if(!s) return;
+  const name = s.name.trim();
+  if(!name){ toast('Укажите название картриджа'); return; }
+  const barcode = s.barcode.trim();
+  const clash = barcode && state.cartridges.find(x => x.barcode === barcode && x.id !== s.id);
+  if(clash){ toast(`Этот штрих-код уже у «${clash.name}»`); return; }
+
+  let c;
+  if(s.isNew){
+    const slug = name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '');
+    c = {id: slug + '-' + Math.random().toString(36).slice(2,6), stock: s.initialStock, branchStock: {}, onOrder: false};
+    state.cartridges.push(c);
+    if(s.initialStock > 0){
+      state.history[c.id] = [{date: todayIso(), type:'receive', wh: MAIN_WH, qty: s.initialStock, result: s.initialStock, who: 'Начальный остаток', dept: ''}];
+      state.activity.unshift({date:'только что', type:'receive', text:`${name} ×${s.initialStock}`, meta:'Начальный остаток'});
+      state.activity = state.activity.slice(0,8);
+    } else {
+      state.history[c.id] = [];
+    }
+  } else {
+    c = state.cartridges.find(x => x.id === s.id);
+    if(!c) return;
+  }
+  const isNew = s.isNew;
+  c.name = name;
+  c.barcode = barcode;
+  c.type = s.type;
+  c.typeLabel = TYPE_LABELS[s.type];
+  c.color = s.color;
+  c.colorHex = COLORS[s.color];
+  c.supplier = s.supplier.trim();
+  c.location = s.location.trim();
+  saveState();
+  closeCartridgeEdit();
+  toast(isNew ? `Добавлен: ${c.name}` : `Сохранено: ${c.name}`);
+  render();
+}
+function deleteCartridge(id){
+  const c = state.cartridges.find(x => x.id === id);
+  if(!c) return;
+  if(!confirm(`Удалить «${c.name}» из склада? История операций по нему тоже будет удалена. Это необратимо.`)) return;
+  state.cartridges = state.cartridges.filter(x => x.id !== id);
+  delete state.history[id];
+  saveState();
+  cartridgeEditState = null;
+  document.getElementById('modal-root').innerHTML = '';
+  toast(`Удалено: ${c.name}`);
+  location.hash = '#/inventory';
+  render();
+}
+
+/* ---------- excel report ---------- */
+let reportState = null;
+
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+function reportPreset(kind){
+  const t = todayIso();
+  const y = Number(t.slice(0,4)), m = Number(t.slice(5,7));
+  if(kind === 'month') return {from: t.slice(0,8) + '01', to: t};
+  if(kind === 'prev'){
+    const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
+    const last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+    const mm = String(pm).padStart(2,'0');
+    return {from: `${py}-${mm}-01`, to: `${py}-${mm}-${String(last).padStart(2,'0')}`};
+  }
+  let earliest = t;
+  Object.values(state.history).forEach(list => list.forEach(h => { if(h.date < earliest) earliest = h.date; }));
+  return {from: earliest, to: t};
+}
+function openReport(){
+  reportState = {...reportPreset('month'), preset: 'month'};
+  renderReportModal();
+}
+function closeReport(){
+  reportState = null;
+  document.getElementById('modal-root').innerHTML = '';
+}
+function setReportPreset(kind){
+  reportState = {...reportPreset(kind), preset: kind};
+  renderReportModal();
+}
+function setReportDate(field, value){
+  if(!reportState || !value) return;
+  reportState[field] = value;
+  reportState.preset = null;
+  renderReportModal();
+}
+
+// Opening/closing stock are reconstructed backwards from the current stock, so the
+// report stays correct even though only the latest stock value is stored.
+// Returns one row per cartridge per warehouse: in = from supplier, got = from another
+// warehouse, sent = to another warehouse, out = расход.
+function buildReport(from, to){
+  const rows = [];
+  const moves = [];
+  state.cartridges.forEach(c => {
+    // Stored newest-first; walk oldest-first so same-day moves keep their real order.
+    const hist = [...(state.history[c.id] || [])].reverse();
+    const acc = {};
+    const get = id => acc[id] || (acc[id] = {afterTo:0, inQty:0, got:0, sent:0, outQty:0});
+    hist.forEach(h => {
+      if(h.date > to){
+        Object.entries(entryDeltas(h)).forEach(([wh, v]) => { get(wh).afterTo += v; });
+        return;
+      }
+      if(h.date < from) return;
+      moves.push({h, c});
+      if(h.type === 'receive') get(h.wh || MAIN_WH).inQty += h.qty;
+      else if(h.type === 'issue') get(h.wh || MAIN_WH).outQty += h.qty;
+      else if(h.type === 'transfer'){ get(h.from || MAIN_WH).sent += h.qty; get(h.to).got += h.qty; }
+    });
+    state.warehouses.forEach(w => {
+      const a = get(w.id);
+      const closing = whStock(c, w.id) - a.afterTo;
+      const opening = closing - a.inQty - a.got + a.sent + a.outQty;
+      rows.push({c, wh: w, opening, closing, inQty: a.inQty, got: a.got, sent: a.sent, outQty: a.outQty});
+    });
+  });
+  moves.sort((a,b) => a.h.date.localeCompare(b.h.date));
+  return {rows, moves};
+}
+function rowHasData(r){ return r.opening || r.closing || r.inQty || r.got || r.sent || r.outQty; }
+
+function renderReportModal(){
+  const root = document.getElementById('modal-root');
+  const s = reportState;
+  if(!s){ root.innerHTML = ''; return; }
+  const bad = s.from > s.to;
+  const {rows, moves} = bad ? {rows:[], moves:[]} : buildReport(s.from, s.to);
+  const inSum = rows.reduce((a,r) => a + r.inQty, 0);
+  const sentSum = rows.filter(r => r.wh.id === MAIN_WH).reduce((a,r) => a + r.sent, 0);
+  const printerSum = moves.filter(m => m.h.type === 'issue' && printerNameOf(m.h)).reduce((a,m) => a + m.h.qty, 0);
+  const outSum = rows.reduce((a,r) => a + r.outQty, 0);
+  const chip = (kind, label) => `<button class="filter-chip ${s.preset===kind?'active':''}" onclick="setReportPreset('${kind}')">${label}</button>`;
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closeReport()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1>Отчёт в Excel</h1>
+        <button class="icon-btn" aria-label="Закрыть" onclick="closeReport()">${ICONS.x}</button>
+      </div>
+      <p style="margin:6px 0 16px;font-size:15px;color:var(--faint)">Выберите период. В файле: итоги по складам, лист на каждый склад, отчёт по принтерам, все движения и остатки.</p>
+      <div class="filter-row">${chip('month','Этот месяц')}${chip('prev','Прошлый месяц')}${chip('all','Всё время')}</div>
+      <div style="display:flex;gap:12px">
+        <div class="field" style="flex:1"><span class="field-lbl">С</span><input class="input" type="date" value="${s.from}" onchange="setReportDate('from', this.value)"></div>
+        <div class="field" style="flex:1"><span class="field-lbl">По</span><input class="input" type="date" value="${s.to}" onchange="setReportDate('to', this.value)"></div>
+      </div>
+      <div class="warn-box">${bad
+        ? '<span style="color:var(--crit-fg)">Дата «С» позже даты «По»</span>'
+        : `<span>За период: <b style="color:var(--ok-fg)">пришло ${inSum}</b> · <b style="color:var(--order-fg)">в филиалы ${sentSum}</b> · <b style="color:var(--crit-fg)">расход ${outSum}</b> (в принтеры с отметкой: ${printerSum}) · операций ${moves.length}</span>`}</div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="closeReport()">Отмена</button>
+        <button class="btn-primary btn-in" onclick="downloadReport()">${ICONS.excel}Скачать Excel</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function downloadReport(){
+  const s = reportState;
+  if(!s) return;
+  if(s.from > s.to){ toast('Проверьте даты периода'); return; }
+  if(typeof XLSX === 'undefined'){ toast('Модуль Excel не загрузился — проверьте интернет'); return; }
+
+  const {rows, moves} = buildReport(s.from, s.to);
+  const period = `${fmtDate(s.from)} — ${fmtDate(s.to)}`;
+  const created = new Date().toLocaleString('ru-RU');
+  // A deleted branch still appears if it had stock or moves inside the period.
+  const whs = state.warehouses.filter(w => !w.deleted || rows.some(r => r.wh.id === w.id && rowHasData(r)));
+  const sum = (list, k) => list.reduce((a,r) => a + r[k], 0);
+
+  const overviewRows = [
+    ['Отчёт по картриджам'],
+    ['Период', period],
+    ['Сформирован', created],
+    [],
+    ['Склад', 'Было на начало', 'Пришло от поставщика', 'Получено с других складов', 'Передано на другие склады', 'Расход', 'Осталось на конец'],
+    ...whs.map(w => {
+      const list = rows.filter(r => r.wh.id === w.id);
+      return [w.name + (w.id === MAIN_WH ? ' (основной)' : ''), sum(list,'opening'), sum(list,'inQty'), sum(list,'got'), sum(list,'sent'), sum(list,'outQty'), sum(list,'closing')];
+    }),
+    [],
+    ['Всего', sum(rows,'opening'), sum(rows,'inQty'), sum(rows,'got'), sum(rows,'sent'), sum(rows,'outQty'), sum(rows,'closing')],
+  ];
+
+  // One sheet per warehouse; columns that are zero for the whole warehouse are dropped
+  // (a branch never gets supplier deliveries, the main warehouse rarely gets returns).
+  const warehouseSheet = w => {
+    const isMain = w.id === MAIN_WH;
+    const list = rows.filter(r => r.wh.id === w.id && (isMain || rowHasData(r)));
+    const cols = [
+      {title:'Было на начало', key:'opening', show:true},
+      {title:'Пришло от поставщика', key:'inQty', show: isMain || sum(list,'inQty') > 0},
+      {title: isMain ? 'Возвращено из филиалов' : 'Получено', key:'got', show: !isMain || sum(list,'got') > 0},
+      {title: isMain ? 'Передано в филиалы' : 'Передано', key:'sent', show: isMain || sum(list,'sent') > 0},
+      {title:'Расход', key:'outQty', show:true},
+      {title:'Осталось на конец', key:'closing', show:true},
+    ].filter(col => col.show);
+    return [
+      [`Склад: ${w.name}`],
+      ['Период', period],
+      [],
+      ['Картридж', ...cols.map(col => col.title)],
+      ...list.map(r => [r.c.name, ...cols.map(col => r[col.key])]),
+      [],
+      ['Итого', ...cols.map(col => sum(list, col.key))],
+    ];
+  };
+
+  const moveRows = [
+    ['Дата', 'Картридж', 'Операция', 'Склад', 'Принтер', 'Кол-во', 'Остаток после', 'Кто', 'Комментарий'],
+    ...moves.map(({h, c}) => [
+      fmtDate(h.date), c.name,
+      h.type === 'receive' ? 'Приход' : h.type === 'issue' ? 'Расход' : 'Передача',
+      h.type === 'transfer' ? `${whName(h.from)} → ${whName(h.to)}` : whName(h.wh),
+      printerNameOf(h),
+      h.type === 'issue' ? -h.qty : h.qty,
+      h.result, h.who && h.who !== '—' ? h.who : '', h.dept || '',
+    ]),
+  ];
+
+  // Printer report: every расход in the period, grouped by the printer it went into.
+  const printerWh = p => { const w = p && state.warehouses.find(x => x.id === p.wh); return w ? w.name : 'Не указан'; };
+  const byPrinter = {};
+  moves.forEach(({h, c}) => {
+    if(h.type !== 'issue') return;
+    const key = h.printerId || h.printerName || '';
+    const e = byPrinter[key] || (byPrinter[key] = {key, name: printerNameOf(h) || 'Принтер не указан', printer: state.printers.find(p => p.id === h.printerId), qty: 0, last: '', items: {}});
+    e.qty += h.qty;
+    if(h.date > e.last) e.last = h.date;
+    const it = e.items[c.id] || (e.items[c.id] = {c, qty: 0, last: ''});
+    it.qty += h.qty;
+    if(h.date > it.last) it.last = h.date;
+  });
+  // Printers with nothing installed still get a row, so the list is complete.
+  state.printers.forEach(p => { if(!byPrinter[p.id]) byPrinter[p.id] = {key: p.id, name: p.name, printer: p, qty: 0, last: '', items: {}}; });
+  const printerList = Object.values(byPrinter).sort((a,b) => (a.key === '') - (b.key === '') || b.qty - a.qty || a.name.localeCompare(b.name));
+  const printerRows = [
+    ['Отчёт по принтерам'],
+    ['Период', period],
+    [],
+    ['Принтер', 'Где стоит', 'Отдел / кабинет', 'Серийный номер', 'Установлено картриджей, шт.', 'Последняя установка'],
+    ...printerList.map(e => [e.name, e.key ? printerWh(e.printer) : '', e.printer ? e.printer.location || '' : '', e.printer && e.printer.serial !== '—' ? e.printer.serial || '' : '', e.qty, e.last ? fmtDate(e.last) : '']),
+    [],
+    ['Итого', '', '', '', printerList.reduce((a,e) => a + e.qty, 0), ''],
+  ];
+  const printerItemRows = [
+    ['Принтер', 'Где стоит', 'Картридж', 'Тип', 'Цвет', 'Установлено, шт.', 'Последняя установка'],
+    ...printerList.flatMap(e => Object.values(e.items).sort((a,b) => b.qty - a.qty).map(it =>
+      [e.name, e.key ? printerWh(e.printer) : '', it.c.name, it.c.typeLabel, it.c.color, it.qty, fmtDate(it.last)])),
+  ];
+
+  const liveWhs = activeWarehouses();
+  const stockRows = [
+    ['Картридж', 'Штрих-код', 'Тип', 'Цвет', ...liveWhs.map(w => w.name), 'Всего', 'Поставщик', 'Место хранения'],
+    ...state.cartridges.map(c => [c.name, c.barcode || '', c.typeLabel, c.color, ...liveWhs.map(w => whStock(c, w.id)), totalStock(c), c.supplier || '', c.location || '']),
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const usedNames = new Set();
+  const addSheet = (rows, name, widths) => {
+    // Excel sheet names: max 31 chars, no []:*?/\ and unique within the file.
+    let base = String(name).replace(/[\[\]:*?\/\\]/g, ' ').trim().slice(0, 28) || 'Лист';
+    let sheetName = base, n = 2;
+    while(usedNames.has(sheetName.toLowerCase())) sheetName = `${base} ${n++}`;
+    usedNames.add(sheetName.toLowerCase());
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = widths.map(w => ({wch: w}));
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  };
+  addSheet(overviewRows, 'Итоги', [24, 16, 20, 24, 24, 10, 18]);
+  whs.forEach(w => addSheet(warehouseSheet(w), w.name, [26, 16, 20, 22, 20, 10, 18]));
+  addSheet(printerRows, 'Принтеры', [30, 16, 20, 18, 26, 20]);
+  addSheet(printerItemRows, 'Принтеры и картриджи', [30, 16, 26, 11, 11, 16, 20]);
+  addSheet(moveRows, 'Движения', [12, 26, 11, 24, 28, 9, 14, 20, 28]);
+  addSheet(stockRows, 'Остатки', [26, 16, 11, 11, ...liveWhs.map(() => 12), 9, 16, 18]);
+  XLSX.writeFile(wb, `Отчёт_картриджи_${s.from}_${s.to}.xlsx`);
+
+  closeReport();
+  toast('Отчёт скачан');
+}
+
+/* ---------- barcode scanner ---------- */
+let html5QrCodeInstance = null;
+let cameraRunning = false;
+let scanResultCallback = null;
+
+function findCartridgeByBarcode(code){
+  const trimmed = String(code).trim();
+  return state.cartridges.find(c => c.barcode && c.barcode === trimmed);
+}
+function onBarcodeScanned(code){
+  const c = findCartridgeByBarcode(code);
+  if(c){
+    openMovement(c.id, 'issue');
+    toast(`Найден: ${c.name}`);
+  } else {
+    document.getElementById('modal-root').innerHTML = '';
+    if(confirm(`Штрих-код «${code}» не найден на складе.\nДобавить новый картридж с этим кодом?`)){
+      openCartridgeCreate(String(code).trim());
+    }
+  }
+}
+function onBarcodeScannedForPrinter(code){
+  if(printerModalState){
+    printerModalState.serial = String(code).trim();
+    renderPrinterModal();
+  }
+  toast('Штрих-код считан');
+}
+function onBarcodeScannedInModal(code){
+  const c = findCartridgeByBarcode(code);
+  if(c){
+    if(modalState){
+      modalState.cartridgeId = c.id;
+      if(modalState.type === 'receive') modalState.party = c.supplier;
+    }
+    toast(`Найден: ${c.name}`);
+  } else {
+    toast(`Штрих-код «${code}» не найден в базе`);
+  }
+  if(modalState) renderModal();
+}
+// Picks the printer in an open расход by its scanned serial number.
+function onBarcodeScannedPrinterInModal(code){
+  const trimmed = String(code).trim();
+  const p = state.printers.find(x => x.serial && x.serial !== '—' && x.serial === trimmed);
+  if(p){
+    toast(`Принтер: ${p.name}`);
+    if(modalState){ setMovementPrinter(p.id); return; }
+  } else {
+    toast(`Принтер с серийным номером «${trimmed}» не найден`);
+  }
+  if(modalState) renderModal();
+}
+
+function openScanner(onResult){
+  scanResultCallback = onResult;
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closeScanner()">
+    <div class="modal-card" style="max-width:420px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div><h1 style="font-size:18px">Сканировать штрих-код</h1><p style="margin:4px 0 0;font-size:12.5px;color:var(--muted)">Наведите камеру на штрих-код картриджа</p></div>
+        <button class="icon-btn" onclick="closeScanner()">${ICONS.x}</button>
+      </div>
+      <div id="scanner-reader" style="margin-top:14px;border-radius:12px;overflow:hidden;background:#14162B;min-height:220px"></div>
+      <div id="scan-status" style="margin-top:10px;font-size:12px;color:var(--muted)">Запрашиваю доступ к камере…</div>
+      <div class="field" style="margin-top:6px">
+        <span class="field-lbl">Или введите код вручную</span>
+        <div style="display:flex;gap:8px">
+          <input class="input" id="scan-manual-input" placeholder="Штрих-код" onkeydown="if(event.key==='Enter'){event.preventDefault();submitManualScan();}">
+          <button class="btn-secondary" onclick="submitManualScan()">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  startCameraScan();
+  setTimeout(() => { const el = document.getElementById('scan-manual-input'); if(el) el.focus(); }, 50);
+}
+function closeScanner(){
+  stopCameraScan();
+  scanResultCallback = null;
+  if(modalState) renderModal();
+  else if(printerModalState) renderPrinterModal();
+  else if(cartridgeEditState) renderCartridgeEditModal();
+  else document.getElementById('modal-root').innerHTML = '';
+}
+function setScanStatus(msg){
+  const el = document.getElementById('scan-status');
+  if(el) el.textContent = msg;
+}
+function startCameraScan(){
+  if(typeof Html5Qrcode === 'undefined'){
+    setScanStatus('Библиотека сканера не загрузилась (нет интернета?) — введите код вручную.');
+    return;
+  }
+  if(!window.isSecureContext){
+    setScanStatus('Камера доступна только по HTTPS или на localhost. Введите код вручную, либо откройте сайт по защищённому адресу.');
+    return;
+  }
+  try{
+    const inst = new Html5Qrcode('scanner-reader');
+    html5QrCodeInstance = inst;
+    inst.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 140 } },
+      (decodedText) => handleScanResult(decodedText),
+      () => {}
+    ).then(() => {
+        if(html5QrCodeInstance !== inst){
+          // Modal was closed before the camera finished starting — shut this one down
+          // so the stream doesn't keep the camera light on in the background.
+          inst.stop().then(() => inst.clear()).catch(() => {});
+          return;
+        }
+        cameraRunning = true;
+        setScanStatus('Наведите камеру на штрих-код…');
+      })
+     .catch(err => {
+        if(html5QrCodeInstance === inst) cameraRunning = false;
+        setScanStatus('Камера недоступна: ' + (err && err.message ? err.message : String(err)) + ' — введите код вручную.');
+      });
+  }catch(err){
+    cameraRunning = false;
+    setScanStatus('Не удалось запустить камеру — введите код вручную.');
+  }
+}
+function stopCameraScan(){
+  if(html5QrCodeInstance){
+    const inst = html5QrCodeInstance;
+    const wasRunning = cameraRunning;
+    html5QrCodeInstance = null;
+    cameraRunning = false;
+    if(wasRunning) inst.stop().then(() => inst.clear()).catch(() => {});
+    else { try{ inst.clear(); }catch(e){} }
+  }
+}
+function submitManualScan(){
+  const input = document.getElementById('scan-manual-input');
+  const val = input ? input.value.trim() : '';
+  if(!val) return;
+  handleScanResult(val);
+}
+function handleScanResult(code){
+  const cb = scanResultCallback;
+  stopCameraScan();
+  scanResultCallback = null;
+  if(cb) cb(code);
+}
+
+/* ---------- shell / nav / router ---------- */
+function updateNavActive(view){
+  // The mobile «Ещё» tab stands for every section that has no tab of its own.
+  const moreViews = ['settings', 'warehouses', 'printers', 'suppliers'];
+  document.querySelectorAll('[data-view]').forEach(el => {
+    const v = el.dataset.view;
+    const match = v === view || (view==='detail' && v==='inventory') || (v==='more' && moreViews.includes(view));
+    el.classList.toggle('active', match);
+  });
+}
+function updateMobileTopbar(view, param){
+  const el = document.getElementById('mobile-topbar-inner');
+  if(!el) return;
+  const backBar = (href, title) => `<a href="${href}" style="display:flex;color:#4B4F5B" aria-label="Назад">${ICONS.back}</a><span style="font-size:15px;font-weight:700;flex-grow:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px">${escapeHtml(title)}</span><span style="width:18px"></span>`;
+  if(view === 'detail'){
+    const c = state.cartridges.find(x => x.id === param);
+    el.innerHTML = backBar('#/inventory', c ? c.name : 'Картридж');
+  } else if(view === 'warehouses' && param){
+    el.innerHTML = backBar('#/warehouses', whName(param));
+  } else {
+    el.innerHTML = `<div class="brand-row"><div class="brand-mark"></div><span class="brand-name">Картотека</span></div><button class="icon-btn" aria-label="Сканировать штрих-код" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}</button>`;
+  }
+}
+
+function render(){
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  const view = parts[0] || 'dashboard';
+  const param = parts[1];
+
+  let html;
+  if(view === 'inventory') html = renderInventoryView();
+  else if(view === 'detail') html = renderDetailView(param);
+  else if(view === 'warehouses') html = param ? renderWarehouseView(param) : renderWarehousesView();
+  else if(view === 'printers') html = renderPrintersView();
+  else if(view === 'suppliers') html = renderSuppliersView();
+  else if(view === 'history') html = renderHistoryView();
+  else if(view === 'settings') html = renderSettingsView();
+  else html = renderDashboardView();
+
+  document.getElementById('view').innerHTML = html;
+  updateNavActive(view);
+  updateMobileTopbar(view, param);
+
+  if(view === 'inventory'){
+    updateInventoryList();
+    const input = document.getElementById('inv-search');
+    if(input) input.addEventListener('input', e => { searchQuery = e.target.value; updateInventoryList(); });
+  }
+  if(view === 'history') updateHistoryList();
+  window.scrollTo(0,0);
+}
+
+window.addEventListener('hashchange', render);
+window.addEventListener('DOMContentLoaded', render);
