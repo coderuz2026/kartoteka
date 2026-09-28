@@ -20,6 +20,7 @@ const ICONS = {
   edit: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"/></svg>`,
   trash: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/><path d="M8 7v13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7"/><path d="M10 11v6M14 11v6"/></svg>`,
   transfer: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>`,
+  cloud: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px"><path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 9.1 4.5 4.5 0 0 0 7 18Z"/></svg>`,
   store: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/></svg>`,
 };
 
@@ -102,43 +103,289 @@ function defaultData(){
   };
 }
 
-function loadState(){
+// Back-fills fields added over time, so data saved by an older version (in this
+// browser, in the cloud or in a backup file) keeps working with the current views.
+function normalizeState(parsed){
+  const s = parsed && typeof parsed === 'object' ? parsed : {};
+  if(!Array.isArray(s.cartridges)) s.cartridges = [];
+  if(!s.history || typeof s.history !== 'object') s.history = {};
+  if(!Array.isArray(s.activity)) s.activity = [];
+  if(!Array.isArray(s.printers)) s.printers = [];
+  // Data saved before warehouses existed: everything it holds sits on the main warehouse.
+  if(!Array.isArray(s.warehouses) || !s.warehouses.length) s.warehouses = defaultWarehouses();
+  const demo = defaultData();
+  s.cartridges.forEach(c => {
+    if(c.barcode === undefined){
+      const match = demo.cartridges.find(x => x.id === c.id);
+      c.barcode = match ? match.barcode : '';
+    }
+    if(!c.branchStock) c.branchStock = {};
+    // Only toner and ink are tracked now, and colors come from a fixed list.
+    if(!TYPE_LABELS[c.type]) c.type = 'toner';
+    c.typeLabel = TYPE_LABELS[c.type];
+    c.color = normalizeColor(c.color);
+    c.colorHex = COLORS[c.color];
+  });
+  s.printers.forEach(p => { if(p.wh === undefined) p.wh = ''; });
+  delete s.lastIssueWh; // now a per-device preference, see getPref()
+  return s;
+}
+
+// Data kept in this browser only (the mode used before the cloud was connected).
+function loadLocal(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){
-      const parsed = JSON.parse(raw);
-      // Back-fill fields added after this browser's data was first saved, so an
-      // older localStorage snapshot doesn't crash newer views (e.g. printers,
-      // barcodes) or leave barcode lookups silently unable to match anything.
-      const fresh = defaultData();
-      if(!parsed.printers) parsed.printers = fresh.printers;
-      // Data saved before warehouses existed: everything it holds sits on the main warehouse.
-      if(!Array.isArray(parsed.warehouses) || !parsed.warehouses.length) parsed.warehouses = defaultWarehouses();
-      if(Array.isArray(parsed.cartridges)){
-        parsed.cartridges.forEach(c => {
-          if(!c.barcode){
-            const match = fresh.cartridges.find(x => x.id === c.id);
-            c.barcode = match ? match.barcode : '';
-          }
-          if(!c.branchStock) c.branchStock = {};
-          // Only toner and ink are tracked now, and colors come from a fixed list.
-          if(!TYPE_LABELS[c.type]) c.type = 'toner';
-          c.typeLabel = TYPE_LABELS[c.type];
-          c.color = normalizeColor(c.color);
-          c.colorHex = COLORS[c.color];
-        });
-      }
-      parsed.printers.forEach(p => { if(p.wh === undefined) p.wh = ''; });
-      return parsed;
-    }
+    if(raw) return normalizeState(JSON.parse(raw));
   }catch(e){}
-  return defaultData();
+  return null;
 }
 function saveState(){
+  if(cloud.enabled) return; // the cloud copy is written by commit()
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
 }
 
-let state = loadState();
+// Per-device settings that must not travel between phone and PC.
+const PREFS_KEY = 'kartoteka-prefs';
+function getPref(key){
+  try{ return (JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'))[key]; }catch(e){ return undefined; }
+}
+function setPref(key, value){
+  try{
+    const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    if(value === undefined) delete p[key]; else p[key] = value;
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+  }catch(e){}
+}
+
+function nowLabel(){
+  return new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+
+/* ---------- saving changes ---------- */
+// A validation failure found while applying a change; its text is shown to the user.
+function userError(message){ const e = new Error(message); e.userMessage = message; return e; }
+
+// Every change goes through commit(mutator). The mutator edits the state object it
+// is given and must not touch anything else: in cloud mode it runs inside a
+// Firestore transaction against the latest shared data and may be re-run if
+// another device saved at the same moment. Returns {ok, result}.
+let commitBusy = false;
+async function commit(mutator){
+  if(commitBusy) return {ok:false};
+  if(!cloud.enabled){
+    // Apply to a copy so a failed validation leaves the real state untouched.
+    const draft = JSON.parse(JSON.stringify(state));
+    try{
+      const result = mutator(draft);
+      state = draft;
+      saveState();
+      return {ok:true, result};
+    }catch(e){
+      if(e.userMessage){ toast(e.userMessage); return {ok:false}; }
+      throw e;
+    }
+  }
+  commitBusy = true;
+  try{
+    const {state: fresh, result} = await cloudTransact(mutator);
+    state = fresh;
+    return {ok:true, result};
+  }catch(e){
+    if(e.userMessage) toast(e.userMessage);
+    else if(!navigator.onLine || e.code === 'unavailable') toast('Нет интернета — операция не сохранена. Повторите, когда появится связь.');
+    else if(e.code === 'permission-denied') toast('Нет доступа к базе — проверьте правила Firestore');
+    else toast('Не удалось сохранить: ' + (e.message || e));
+    return {ok:false};
+  }finally{
+    commitBusy = false;
+  }
+}
+
+/* ---------- cloud (Firebase) ---------- */
+// Layout in Firestore:
+//   kartoteka/main              {data: JSON of everything except history, months: ['2026-08', …]}
+//   kartoteka/main/months/YYYY-MM  {entries: JSON array of that month's history entries}
+// History is split by month so no single document ever approaches Firestore's 1 MB cap.
+const cloud = {
+  enabled: false,
+  user: null,
+  authChecked: false,
+  loaded: false,       // first snapshot of both main and months arrived
+  empty: false,        // the cloud has never been written to
+  error: '',
+  mainDoc: undefined,  // undefined = not received yet, null = does not exist
+  monthDocs: undefined,
+  unsub: [],
+};
+
+function splitState(s){
+  const main = {};
+  Object.keys(s).forEach(k => { if(k !== 'history') main[k] = s[k]; });
+  const months = {};
+  // Per-cartridge lists are newest-first; keep that relative order inside each month.
+  Object.keys(s.history || {}).forEach(cid => (s.history[cid] || []).forEach(h => {
+    const key = String(h.date).slice(0,7);
+    if(!months[key]) months[key] = [];
+    months[key].push(Object.assign({cid}, h));
+  }));
+  return {main, months};
+}
+function joinState(main, months){
+  const s = Object.assign({}, main, {history: {}});
+  Object.keys(months).sort().reverse().forEach(key => (months[key] || []).forEach(e => {
+    const h = Object.assign({}, e);
+    const cid = h.cid; delete h.cid;
+    if(!s.history[cid]) s.history[cid] = [];
+    s.history[cid].push(h);
+  }));
+  return normalizeState(s);
+}
+
+async function cloudTransact(mutator){
+  const db = firebase.firestore();
+  const mainRef = db.collection('kartoteka').doc('main');
+  const monthsCol = mainRef.collection('months');
+  let result;
+  const fresh = await db.runTransaction(async tx => {
+    const mainSnap = await tx.get(mainRef);
+    const doc = mainSnap.exists ? mainSnap.data() : null;
+    const keys = doc && Array.isArray(doc.months) ? doc.months : [];
+    const before = {};
+    for(const k of keys){
+      const snap = await tx.get(monthsCol.doc(k));
+      before[k] = snap.exists ? JSON.parse(snap.data().entries || '[]') : [];
+    }
+    const s = doc ? joinState(JSON.parse(doc.data), before) : normalizeState(emptyData());
+    result = mutator(s);
+    const out = splitState(s);
+    const newKeys = Object.keys(out.months).filter(k => out.months[k].length).sort();
+    new Set(keys.concat(newKeys)).forEach(k => {
+      const next = JSON.stringify(out.months[k] || []);
+      if(next === JSON.stringify(before[k] || [])) return;
+      if(out.months[k] && out.months[k].length) tx.set(monthsCol.doc(k), {entries: next});
+      else tx.delete(monthsCol.doc(k));
+    });
+    tx.set(mainRef, {
+      data: JSON.stringify(out.main),
+      months: newKeys,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: cloud.user ? cloud.user.email : '',
+    });
+    return s;
+  });
+  return {state: fresh, result};
+}
+
+function rebuildFromCloud(){
+  if(cloud.mainDoc === undefined || cloud.monthDocs === undefined) return;
+  if(cloud.mainDoc === null){
+    cloud.empty = true;
+    state = normalizeState(emptyData());
+  } else {
+    cloud.empty = false;
+    const keys = Array.isArray(cloud.mainDoc.months) ? cloud.mainDoc.months : [];
+    const months = {};
+    keys.forEach(k => { months[k] = cloud.monthDocs[k] || []; });
+    try{ state = joinState(JSON.parse(cloud.mainDoc.data), months); }
+    catch(e){ cloud.error = 'Данные в облаке повреждены: ' + e.message; }
+  }
+  cloud.loaded = true;
+  render({keepScroll: true});
+}
+
+function stopCloudListeners(){
+  cloud.unsub.forEach(fn => { try{ fn(); }catch(e){} });
+  cloud.unsub = [];
+  cloud.mainDoc = undefined;
+  cloud.monthDocs = undefined;
+  cloud.loaded = false;
+}
+function startCloudListeners(){
+  stopCloudListeners();
+  const mainRef = firebase.firestore().collection('kartoteka').doc('main');
+  const onError = e => {
+    cloud.error = e.code === 'permission-denied'
+      ? `У аккаунта ${cloud.user ? cloud.user.email : ''} нет доступа к базе. Добавьте эту почту в правила Firestore.`
+      : 'Ошибка связи с базой: ' + (e.message || e);
+    render();
+  };
+  cloud.unsub.push(mainRef.onSnapshot(snap => {
+    cloud.error = '';
+    cloud.mainDoc = snap.exists ? snap.data() : null;
+    rebuildFromCloud();
+  }, onError));
+  cloud.unsub.push(mainRef.collection('months').onSnapshot(q => {
+    const m = {};
+    q.forEach(d => { try{ m[d.id] = JSON.parse(d.data().entries || '[]'); }catch(e){ m[d.id] = []; } });
+    cloud.monthDocs = m;
+    rebuildFromCloud();
+  }, onError));
+}
+
+function initCloud(){
+  const cfg = window.KARTOTEKA_FIREBASE;
+  if(!cfg || !cfg.apiKey) return;
+  if(typeof firebase === 'undefined'){
+    cloud.enabled = true;
+    cloud.authChecked = true;
+    cloud.error = 'Не удалось загрузить Firebase — проверьте интернет и обновите страницу.';
+    return;
+  }
+  cloud.enabled = true;
+  state = normalizeState(emptyData());
+  firebase.initializeApp(cfg);
+  // Keeps a copy on the device so the app opens fast and shows data while offline.
+  firebase.firestore().enablePersistence({synchronizeTabs: true}).catch(() => {});
+  firebase.auth().onAuthStateChanged(user => {
+    cloud.user = user;
+    cloud.authChecked = true;
+    cloud.error = '';
+    if(user) startCloudListeners();
+    else { stopCloudListeners(); state = normalizeState(emptyData()); }
+    render();
+  });
+}
+
+let loginBusy = false;
+async function submitLogin(){
+  const email = (document.getElementById('login-email') || {}).value || '';
+  const pass = (document.getElementById('login-pass') || {}).value || '';
+  const msg = document.getElementById('login-msg');
+  if(!email.trim() || !pass){ if(msg) msg.textContent = 'Введите почту и пароль'; return; }
+  if(loginBusy) return;
+  loginBusy = true;
+  if(msg) msg.textContent = 'Вход…';
+  try{
+    await firebase.auth().signInWithEmailAndPassword(email.trim(), pass);
+  }catch(e){
+    const bad = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email','auth/invalid-login-credentials'];
+    if(msg) msg.textContent = bad.includes(e.code) ? 'Неверная почта или пароль'
+      : e.code === 'auth/too-many-requests' ? 'Слишком много попыток — подождите пару минут'
+      : e.code === 'auth/network-request-failed' ? 'Нет интернета'
+      : 'Не удалось войти: ' + (e.message || e.code);
+  }finally{
+    loginBusy = false;
+  }
+}
+function signOutCloud(){
+  if(!confirm('Выйти из аккаунта на этом устройстве?')) return;
+  firebase.auth().signOut();
+}
+
+// Moves the data this browser kept before the cloud existed into the (empty) cloud.
+async function uploadLocalToCloud(){
+  const local = loadLocal();
+  if(!local || !local.cartridges.length){ toast('На этом устройстве нет сохранённых данных'); return; }
+  if(!confirm(`Загрузить в общую базу данные этого устройства: ${local.cartridges.length} картриджей, ${local.printers.length} принтеров и всю историю?`)) return;
+  const {ok} = await commit(s => {
+    if(s.cartridges.length) throw userError('В общей базе уже есть данные — загрузка отменена');
+    Object.keys(s).forEach(k => delete s[k]);
+    Object.assign(s, JSON.parse(JSON.stringify(local)));
+  });
+  if(ok){ toast('Данные загружены в общую базу'); render(); }
+}
+
+let state = loadLocal() || defaultData();
 let searchQuery = '';
 let activeFilter = 'all';
 let modalState = null;
@@ -148,19 +395,54 @@ let historyFilter = 'all';
 function emptyData(){
   return {warehouses: defaultWarehouses(), cartridges: [], history: {}, activity: [], printers: []};
 }
-function resetData(mode){
+async function resetData(mode){
+  const everywhere = cloud.enabled ? ' Это изменит данные на ВСЕХ устройствах.' : '';
   const msg = mode === 'empty'
-    ? 'Удалить ВСЕ картриджи, принтеры и историю операций? Склады станут пустыми. Отменить это нельзя.'
-    : 'Заменить все текущие данные демонстрационными (11 примерных картриджей)? Ваши записи будут удалены.';
+    ? 'Удалить ВСЕ картриджи, принтеры и историю операций? Склады станут пустыми. Отменить это нельзя.' + everywhere
+    : 'Заменить все текущие данные демонстрационными (11 примерных картриджей)? Ваши записи будут удалены.' + everywhere;
   if(!confirm(msg)) return;
-  const keepWarehouses = (state.warehouses || []).filter(w => !w.deleted);
-  state = mode === 'empty' ? emptyData() : defaultData();
-  // Clearing wipes stock, not the list of branches the user set up.
-  if(mode === 'empty' && keepWarehouses.length) state.warehouses = keepWarehouses;
-  saveState();
+  const {ok} = await commit(s => {
+    // Clearing wipes stock, not the list of branches the user set up.
+    const keepWarehouses = (s.warehouses || []).filter(w => !w.deleted);
+    const fresh = mode === 'empty' ? emptyData() : defaultData();
+    if(mode === 'empty' && keepWarehouses.length) fresh.warehouses = keepWarehouses;
+    Object.keys(s).forEach(k => delete s[k]);
+    Object.assign(s, fresh);
+  });
+  if(!ok) return;
   toast(mode === 'empty' ? 'Склад очищен. Добавьте свои картриджи.' : 'Загружены демо-данные');
   location.hash = mode === 'empty' ? '#/inventory' : '#/dashboard';
   render();
+}
+
+/* ---------- backup file ---------- */
+function downloadBackup(){
+  const blob = new Blob([JSON.stringify(state, null, 1)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Картотека_копия_${todayIso()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Копия сохранена в файл');
+}
+function restoreBackup(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let data;
+    try{ data = normalizeState(JSON.parse(reader.result)); }
+    catch(e){ toast('Это не файл копии Картотеки'); return; }
+    if(!confirm(`Заменить текущие данные копией из файла (${data.cartridges.length} картриджей)?${cloud.enabled ? ' Это изменит данные на ВСЕХ устройствах.' : ''}`)) return;
+    const {ok} = await commit(s => {
+      Object.keys(s).forEach(k => delete s[k]);
+      Object.assign(s, data);
+    });
+    if(ok){ toast('Данные восстановлены из файла'); render(); }
+  };
+  reader.readAsText(file);
 }
 
 const FILTERS = [
@@ -225,7 +507,7 @@ function setWhStock(c, wh, value){
 function totalStock(c){ return activeWarehouses().reduce((s,w) => s + whStock(c, w.id), 0); }
 function whTotal(wh){ return state.cartridges.reduce((s,c) => s + whStock(c, wh), 0); }
 function defaultIssueWh(){
-  const last = state.lastIssueWh;
+  const last = getPref('lastIssueWh');
   return last && activeWarehouses().some(w => w.id === last) ? last : MAIN_WH;
 }
 // How one history entry changes each warehouse's stock, as {warehouseId: signedQty}.
@@ -388,10 +670,11 @@ function renderDashboardView(){
 
   return `
   <div class="topbar">
-    <div><h1>Главная</h1><p class="sub">${todayLabel()}</p></div>
+    <div><h1>Главная</h1><p class="sub">${todayLabel()}${cloud.enabled ? ` · <span class="cloud-on">${ICONS.cloud} общая база</span>` : ''}</p></div>
     <button class="btn-secondary" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
   </div>
   <div class="content">
+    ${uploadLocalCardTemplate()}
     <div class="big-actions ${hasBranches ? 'four' : ''}">
       <button class="big-btn big-in" onclick="openMovement(null,'receive')">${ICONS.plus}Приход</button>
       <button class="big-btn big-out" onclick="openMovement(null,'issue')">${ICONS.minus}Расход</button>
@@ -640,33 +923,35 @@ function renderPrinterModal(){
     </div>
   </div>`;
 }
-function submitPrinter(){
+async function submitPrinter(){
   const s = printerModalState;
   if(!s) return;
   const name = s.name.trim();
   if(!name){ toast('Укажите принтер'); return; }
-  if(state.printers.some(p => p.id !== s.id && p.name.toLowerCase() === name.toLowerCase())){
-    toast('Такой принтер уже есть в списке');
-    return;
-  }
   const fields = {name, location: s.location.trim(), wh: s.wh, serial: s.serial.trim() || '—', notes: s.notes.trim()};
-  if(s.id){
-    Object.assign(state.printers.find(p => p.id === s.id), fields);
-  } else {
-    const id = 'p-' + name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6);
-    state.printers.push({id, ...fields});
-  }
-  saveState();
+  // The id is made outside the mutator so a retried cloud save doesn't create two printers.
+  const newId = s.id ? null : 'p-' + name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6);
+  const {ok} = await commit(st => {
+    if(st.printers.some(p => p.id !== s.id && p.name.toLowerCase() === name.toLowerCase())) throw userError('Такой принтер уже есть в списке');
+    if(s.id){
+      const p = st.printers.find(x => x.id === s.id);
+      if(!p) throw userError('Этот принтер уже удалён на другом устройстве');
+      Object.assign(p, fields);
+    } else {
+      st.printers.push(Object.assign({id: newId}, fields));
+    }
+  });
+  if(!ok) return;
   closePrinterModal();
   toast(s.id ? `Сохранено: ${name}` : `Принтер добавлен: ${name}`);
   render();
 }
-function deletePrinter(id){
+async function deletePrinter(id){
   const p = state.printers.find(x => x.id === id);
   if(!p) return;
   if(!confirm(`Удалить «${p.name}»? Записи о том, какие картриджи в него ставили, останутся в истории и отчётах.`)) return;
-  state.printers = state.printers.filter(x => x.id !== id);
-  saveState();
+  const {ok} = await commit(st => { st.printers = st.printers.filter(x => x.id !== id); });
+  if(!ok) return;
   toast('Принтер удалён');
   render();
 }
@@ -829,35 +1114,47 @@ function renderWarehouseView(id){
   </div>`;
 }
 
-function addBranch(){
+const nameTaken = (st, name, exceptId) => st.warehouses.some(w => !w.deleted && w.id !== exceptId && w.name.toLowerCase() === name.toLowerCase());
+async function addBranch(){
   const name = (prompt('Название нового филиала:') || '').trim();
   if(!name) return;
-  if(activeWarehouses().some(w => w.name.toLowerCase() === name.toLowerCase())){ toast('Склад с таким названием уже есть'); return; }
-  state.warehouses.push({id: 'wh-' + Math.random().toString(36).slice(2,8), name});
-  saveState();
+  const id = 'wh-' + Math.random().toString(36).slice(2,8);
+  const {ok} = await commit(st => {
+    if(nameTaken(st, name)) throw userError('Склад с таким названием уже есть');
+    st.warehouses.push({id, name});
+  });
+  if(!ok) return;
   toast(`Филиал добавлен: ${name}`);
   render();
 }
-function renameWarehouse(id){
+async function renameWarehouse(id){
   const w = activeWarehouses().find(x => x.id === id);
   if(!w) return;
   const name = (prompt('Новое название склада:', w.name) || '').trim();
   if(!name || name === w.name) return;
-  if(activeWarehouses().some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())){ toast('Склад с таким названием уже есть'); return; }
-  w.name = name;
-  saveState();
+  const {ok} = await commit(st => {
+    if(nameTaken(st, name, id)) throw userError('Склад с таким названием уже есть');
+    const target = st.warehouses.find(x => x.id === id);
+    if(target) target.name = name;
+  });
+  if(!ok) return;
   toast('Склад переименован');
   render();
 }
-function deleteWarehouse(id){
+async function deleteWarehouse(id){
   const w = activeWarehouses().find(x => x.id === id);
   if(!w || id === MAIN_WH) return;
   const left = whTotal(id);
   if(left > 0){ toast(`На «${w.name}» ещё ${left} шт. — сначала спишите или передайте их`); return; }
   if(!confirm(`Удалить филиал «${w.name}»? История операций по нему сохранится.`)) return;
-  w.deleted = true;
-  if(state.lastIssueWh === id) delete state.lastIssueWh;
-  saveState();
+  const {ok} = await commit(st => {
+    const stock = st.cartridges.reduce((sum, c) => sum + ((c.branchStock || {})[id] || 0), 0);
+    if(stock > 0) throw userError(`На «${w.name}» ещё ${stock} шт. — сначала спишите или передайте их`);
+    const target = st.warehouses.find(x => x.id === id);
+    if(target) target.deleted = true;
+  });
+  if(!ok) return;
+  if(getPref('lastIssueWh') === id) setPref('lastIssueWh', undefined);
   toast('Филиал удалён');
   location.hash = '#/warehouses';
 }
@@ -873,18 +1170,67 @@ function renderSettingsView(){
         <a class="menu-link" href="#/suppliers">${ICONS.truck}Поставщики</a>
       </div>
       <div class="card" style="padding:22px">
+        <h2 style="font-size:20px;margin-bottom:8px">${ICONS.cloud} Общая база</h2>
+        ${cloud.enabled
+          ? `<p style="font-size:15px;color:var(--muted);margin:0 0 16px">Подключена: телефон и компьютер видят одни и те же данные.<br>Вы вошли как <b style="color:var(--text)">${escapeHtml(cloud.user ? cloud.user.email : '—')}</b></p>
+             <button class="btn-secondary" onclick="signOutCloud()">Выйти из аккаунта</button>`
+          : `<p style="font-size:15px;color:var(--muted);margin:0">Не подключена — данные хранятся только в этом браузере на этом устройстве.</p>`}
+      </div>
+      ${uploadLocalCardTemplate()}
+      <div class="card" style="padding:22px">
+        <h2 style="font-size:20px;margin-bottom:8px">Резервная копия</h2>
+        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Сохраните все данные в файл на всякий случай. Из файла их можно вернуть.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-secondary" onclick="downloadBackup()">Сохранить копию в файл</button>
+          <label class="btn-secondary" style="cursor:pointer">Восстановить из файла<input type="file" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)"></label>
+        </div>
+      </div>
+      <div class="card" style="padding:22px">
         <h2 style="font-size:20px;margin-bottom:8px">Начать с нуля</h2>
-        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Удаляет все картриджи, принтеры и историю. Склад станет пустым — дальше добавляйте свои картриджи кнопкой «Новый картридж» на складе.</p>
+        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Удаляет все картриджи, принтеры и историю${cloud.enabled ? ' — <b>на всех устройствах</b>' : ''}. Дальше добавляйте свои картриджи кнопкой «Новый картридж».</p>
         <button class="btn-primary btn-out" onclick="resetData('empty')">${ICONS.trash} Очистить всё</button>
       </div>
       <div class="card" style="padding:22px">
         <h2 style="font-size:20px;margin-bottom:8px">Демо-данные</h2>
-        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Заменяет всё на 12 примерных картриджей — чтобы посмотреть, как работает приложение.</p>
+        <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Заменяет всё на 11 примерных картриджей — чтобы посмотреть, как работает приложение.</p>
         <button class="btn-secondary" onclick="resetData('demo')">Загрузить демо-данные</button>
       </div>
-      <p style="font-size:14px;color:var(--faint);margin:0">Данные хранятся только в этом браузере на этом устройстве.</p>
     </div>
   </div>`;
+}
+
+// Offered while the cloud is still empty and this browser holds pre-cloud data.
+function uploadLocalCardTemplate(){
+  if(!cloud.enabled || !cloud.loaded || !cloud.empty) return '';
+  const local = loadLocal();
+  if(!local || !local.cartridges.length) return '';
+  return `
+  <div class="card upload-card">
+    <h2 style="font-size:19px;margin-bottom:6px">Общая база пока пустая</h2>
+    <p style="font-size:15px;color:var(--muted);margin:0 0 14px">На этом устройстве сохранены ваши прежние данные: ${local.cartridges.length} картриджей, ${local.printers.length} принтеров. Загрузите их в общую базу — после этого они появятся на всех устройствах.</p>
+    <button class="btn-primary btn-in" onclick="uploadLocalToCloud()">${ICONS.cloud} Загрузить в общую базу</button>
+  </div>`;
+}
+
+function renderLoginView(){
+  return `
+  <div class="login-wrap">
+    <div class="card login-card">
+      <div class="brand-row" style="padding:0;margin-bottom:18px"><div class="brand-mark"></div><span class="brand-name">Картотека</span></div>
+      <h1 style="font-size:24px">Вход</h1>
+      <p style="margin:6px 0 18px;font-size:15px;color:var(--faint)">Войдите, чтобы открыть общую базу картриджей</p>
+      <form onsubmit="event.preventDefault();submitLogin()">
+        <div class="field"><span class="field-lbl">Почта</span><input class="input" id="login-email" type="email" autocomplete="username" inputmode="email"></div>
+        <div class="field"><span class="field-lbl">Пароль</span><input class="input" id="login-pass" type="password" autocomplete="current-password"></div>
+        <div id="login-msg" style="min-height:22px;font-size:15px;color:var(--crit-fg);margin-bottom:8px"></div>
+        <button class="btn-primary" type="submit" style="width:100%;min-height:56px;font-size:18px">Войти</button>
+      </form>
+      <p style="margin:16px 0 0;font-size:13px;color:var(--faint)">Аккаунты создаются в консоли Firebase. После входа на этом устройстве повторно вводить пароль не нужно.</p>
+    </div>
+  </div>`;
+}
+function renderMessageView(title, text){
+  return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}</div></div>`;
 }
 
 /* ---------- inventory list update (partial re-render, keeps input focus) ---------- */
@@ -1081,59 +1427,68 @@ function renderModal(){
     </div>
   </div>`;
 }
-function submitMovement(){
+async function submitMovement(){
   if(!modalState) return;
-  const c = state.cartridges.find(x => x.id === modalState.cartridgeId);
-  const t = modalState.type;
-  if(modalState.qty < 1){ toast('Укажите количество больше нуля'); return; }
-  const who = modalState.party.trim() || '—';
-  const note = (modalState.note || '').trim();
-  let qty = modalState.qty, entry, message, meta;
-
-  if(t === 'receive'){
-    c.stock += qty;
-    if(c.onOrder) c.onOrder = false;
-    entry = {type:'receive', wh:MAIN_WH, qty, result:c.stock};
-    message = `Приход записан: ${c.name} +${qty}`;
-    meta = modalState.party.trim() || 'Приход';
-  } else {
-    const src = t === 'issue' ? modalState.wh : modalState.from;
-    const dst = modalState.to;
-    if(t === 'transfer' && (!dst || dst === src)){ toast('Выберите, куда передать'); return; }
-    const have = whStock(c, src);
-    if(have === 0){ toast(`На складе «${whName(src)}» нет «${c.name}»`); return; }
-    if(qty > have){
-      if(!confirm(`На складе «${whName(src)}» только ${have} шт. ${t === 'issue' ? 'Списать' : 'Передать'} всё, что есть?`)) return;
-      // Record what actually left the shelf, so reports never count more than existed.
-      qty = have;
-    }
-    setWhStock(c, src, have - qty);
-    if(t === 'issue'){
-      state.lastIssueWh = src;
-      const printer = state.printers.find(p => p.id === modalState.printerId);
-      entry = {type:'issue', wh:src, qty, result: have - qty};
-      if(printer) Object.assign(entry, {printerId: printer.id, printerName: printer.name});
-      message = `Расход записан (${whName(src)}): ${c.name} −${qty}`;
-      meta = [whName(src), printer ? printer.name : '', modalState.party.trim()].filter(Boolean).join(' · ');
-    } else {
-      const toHave = whStock(c, dst);
-      setWhStock(c, dst, toHave + qty);
-      entry = {type:'transfer', from:src, to:dst, qty, result: have - qty, resultTo: toHave + qty};
-      message = `Передано: ${c.name} ×${qty} → ${whName(dst)}`;
-      meta = `${whName(src)} → ${whName(dst)}`;
-    }
+  const m = Object.assign({}, modalState);
+  const t = m.type;
+  if(m.qty < 1){ toast('Укажите количество больше нуля'); return; }
+  const c0 = state.cartridges.find(x => x.id === m.cartridgeId);
+  if(!c0) return;
+  const src = t === 'issue' ? m.wh : m.from;
+  if(t === 'transfer' && (!m.to || m.to === src)){ toast('Выберите, куда передать'); return; }
+  // Ask about an over-issue up front; the mutator below still clips to what the
+  // shared data holds at save time, in case another device changed it meanwhile.
+  if(t !== 'receive'){
+    const have = whStock(c0, src);
+    if(have === 0){ toast(`На складе «${whName(src)}» нет «${c0.name}»`); return; }
+    if(m.qty > have && !confirm(`На складе «${whName(src)}» только ${have} шт. ${t === 'issue' ? 'Списать' : 'Передать'} всё, что есть?`)) return;
   }
+  const who = m.party.trim() || '—';
+  const note = (m.note || '').trim();
+  const stamp = nowLabel();
 
-  Object.assign(entry, {date: todayIso(), who, dept: note});
-  if(!state.history[c.id]) state.history[c.id] = [];
-  state.history[c.id].unshift(entry);
-
-  state.activity.unshift({date: 'только что', type: t, text: `${c.name} ×${qty}`, meta});
-  state.activity = state.activity.slice(0,8);
-
-  saveState();
+  const {ok, result} = await commit(st => {
+    const c = st.cartridges.find(x => x.id === m.cartridgeId);
+    if(!c) throw userError('Этот картридж удалён на другом устройстве');
+    const nameOf = id => { const w = st.warehouses.find(x => x.id === (id || MAIN_WH)); return w ? w.name : 'Склад удалён'; };
+    let qty = m.qty, entry, message, meta;
+    if(t === 'receive'){
+      c.stock += qty;
+      if(c.onOrder) c.onOrder = false;
+      entry = {type:'receive', wh:MAIN_WH, qty, result:c.stock};
+      message = `Приход записан: ${c.name} +${qty}`;
+      meta = m.party.trim() || 'Приход';
+    } else {
+      const have = whStock(c, src);
+      if(have === 0) throw userError(`На складе «${nameOf(src)}» нет «${c.name}»`);
+      // Record what actually left the shelf, so reports never count more than existed.
+      qty = Math.min(qty, have);
+      setWhStock(c, src, have - qty);
+      if(t === 'issue'){
+        const printer = st.printers.find(p => p.id === m.printerId);
+        entry = {type:'issue', wh:src, qty, result: have - qty};
+        if(printer) Object.assign(entry, {printerId: printer.id, printerName: printer.name});
+        message = `Расход записан (${nameOf(src)}): ${c.name} −${qty}`;
+        meta = [nameOf(src), printer ? printer.name : '', m.party.trim()].filter(Boolean).join(' · ');
+      } else {
+        const toHave = whStock(c, m.to);
+        setWhStock(c, m.to, toHave + qty);
+        entry = {type:'transfer', from:src, to:m.to, qty, result: have - qty, resultTo: toHave + qty};
+        message = `Передано: ${c.name} ×${qty} → ${nameOf(m.to)}`;
+        meta = `${nameOf(src)} → ${nameOf(m.to)}`;
+      }
+    }
+    Object.assign(entry, {date: todayIso(), who, dept: note});
+    if(!st.history[c.id]) st.history[c.id] = [];
+    st.history[c.id].unshift(entry);
+    st.activity.unshift({date: stamp, type: t, text: `${c.name} ×${qty}`, meta});
+    st.activity = st.activity.slice(0,8);
+    return message;
+  });
+  if(!ok) return;
+  if(t === 'issue') setPref('lastIssueWh', src);
   closeMovement();
-  toast(message);
+  toast(result);
   render();
 }
 
@@ -1241,52 +1596,55 @@ function renderCartridgeEditModal(){
     </div>
   </div>`;
 }
-function submitCartridgeEdit(){
+async function submitCartridgeEdit(){
   const s = cartridgeEditState;
   if(!s) return;
   const name = s.name.trim();
   if(!name){ toast('Укажите название картриджа'); return; }
   const barcode = s.barcode.trim();
-  const clash = barcode && state.cartridges.find(x => x.barcode === barcode && x.id !== s.id);
-  if(clash){ toast(`Этот штрих-код уже у «${clash.name}»`); return; }
-
-  let c;
-  if(s.isNew){
-    const slug = name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '');
-    c = {id: slug + '-' + Math.random().toString(36).slice(2,6), stock: s.initialStock, branchStock: {}, onOrder: false};
-    state.cartridges.push(c);
-    if(s.initialStock > 0){
-      state.history[c.id] = [{date: todayIso(), type:'receive', wh: MAIN_WH, qty: s.initialStock, result: s.initialStock, who: 'Начальный остаток', dept: ''}];
-      state.activity.unshift({date:'только что', type:'receive', text:`${name} ×${s.initialStock}`, meta:'Начальный остаток'});
-      state.activity = state.activity.slice(0,8);
-    } else {
-      state.history[c.id] = [];
-    }
-  } else {
-    c = state.cartridges.find(x => x.id === s.id);
-    if(!c) return;
-  }
   const isNew = s.isNew;
-  c.name = name;
-  c.barcode = barcode;
-  c.type = s.type;
-  c.typeLabel = TYPE_LABELS[s.type];
-  c.color = s.color;
-  c.colorHex = COLORS[s.color];
-  c.supplier = s.supplier.trim();
-  c.location = s.location.trim();
-  saveState();
+  // Made outside the mutator so a retried cloud save doesn't create two cartridges.
+  const newId = isNew ? name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6) : null;
+  const stamp = nowLabel();
+
+  const {ok} = await commit(st => {
+    const clash = barcode && st.cartridges.find(x => x.barcode === barcode && x.id !== s.id);
+    if(clash) throw userError(`Этот штрих-код уже у «${clash.name}»`);
+    let c;
+    if(isNew){
+      c = {id: newId, stock: s.initialStock, branchStock: {}, onOrder: false};
+      st.cartridges.push(c);
+      st.history[c.id] = [];
+      if(s.initialStock > 0){
+        st.history[c.id].push({date: todayIso(), type:'receive', wh: MAIN_WH, qty: s.initialStock, result: s.initialStock, who: 'Начальный остаток', dept: ''});
+        st.activity.unshift({date: stamp, type:'receive', text:`${name} ×${s.initialStock}`, meta:'Начальный остаток'});
+        st.activity = st.activity.slice(0,8);
+      }
+    } else {
+      c = st.cartridges.find(x => x.id === s.id);
+      if(!c) throw userError('Этот картридж удалён на другом устройстве');
+    }
+    Object.assign(c, {
+      name, barcode,
+      type: s.type, typeLabel: TYPE_LABELS[s.type],
+      color: s.color, colorHex: COLORS[s.color],
+      supplier: s.supplier.trim(), location: s.location.trim(),
+    });
+  });
+  if(!ok) return;
   closeCartridgeEdit();
-  toast(isNew ? `Добавлен: ${c.name}` : `Сохранено: ${c.name}`);
+  toast(isNew ? `Добавлен: ${name}` : `Сохранено: ${name}`);
   render();
 }
-function deleteCartridge(id){
+async function deleteCartridge(id){
   const c = state.cartridges.find(x => x.id === id);
   if(!c) return;
   if(!confirm(`Удалить «${c.name}» из склада? История операций по нему тоже будет удалена. Это необратимо.`)) return;
-  state.cartridges = state.cartridges.filter(x => x.id !== id);
-  delete state.history[id];
-  saveState();
+  const {ok} = await commit(st => {
+    st.cartridges = st.cartridges.filter(x => x.id !== id);
+    delete st.history[id];
+  });
+  if(!ok) return;
   cartridgeEditState = null;
   document.getElementById('modal-root').innerHTML = '';
   toast(`Удалено: ${c.name}`);
@@ -1693,15 +2051,37 @@ function updateMobileTopbar(view, param){
     el.innerHTML = backBar('#/inventory', c ? c.name : 'Картридж');
   } else if(view === 'warehouses' && param){
     el.innerHTML = backBar('#/warehouses', whName(param));
+  } else if(view === 'login'){
+    el.innerHTML = `<div class="brand-row"><div class="brand-mark"></div><span class="brand-name">Картотека</span></div>`;
   } else {
     el.innerHTML = `<div class="brand-row"><div class="brand-mark"></div><span class="brand-name">Картотека</span></div><button class="icon-btn" aria-label="Сканировать штрих-код" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}</button>`;
   }
 }
 
-function render(){
+function render(opts){
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
   const view = parts[0] || 'dashboard';
   const param = parts[1];
+
+  // keepScroll: a data refresh from another device, not a navigation.
+  const keepScroll = !!(opts && opts.keepScroll === true);
+  const hadSearchFocus = document.activeElement && document.activeElement.id === 'inv-search';
+
+  // In cloud mode nothing is shown until the user is signed in and the data arrived.
+  let gate = null;
+  if(cloud.enabled){
+    if(cloud.error) gate = renderMessageView('Нет доступа к данным', escapeHtml(cloud.error));
+    else if(!cloud.authChecked) gate = renderMessageView('Загрузка…', 'Подключаемся к общей базе');
+    else if(!cloud.user) gate = renderLoginView();
+    else if(!cloud.loaded) gate = renderMessageView('Загрузка…', 'Получаем данные из общей базы');
+  }
+  document.body.classList.toggle('locked', !!gate);
+  if(gate){
+    document.getElementById('view').innerHTML = gate;
+    document.getElementById('modal-root').innerHTML = '';
+    updateMobileTopbar('login');
+    return;
+  }
 
   let html;
   if(view === 'inventory') html = renderInventoryView();
@@ -1720,11 +2100,14 @@ function render(){
   if(view === 'inventory'){
     updateInventoryList();
     const input = document.getElementById('inv-search');
-    if(input) input.addEventListener('input', e => { searchQuery = e.target.value; updateInventoryList(); });
+    if(input){
+      input.addEventListener('input', e => { searchQuery = e.target.value; updateInventoryList(); });
+      if(hadSearchFocus){ input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }
   }
   if(view === 'history') updateHistoryList();
-  window.scrollTo(0,0);
+  if(!keepScroll) window.scrollTo(0,0);
 }
 
-window.addEventListener('hashchange', render);
-window.addEventListener('DOMContentLoaded', render);
+window.addEventListener('hashchange', () => render());
+window.addEventListener('DOMContentLoaded', () => { initCloud(); render(); });
