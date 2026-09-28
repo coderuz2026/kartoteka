@@ -1959,7 +1959,7 @@ function openScanner(onResult){
     </div>
   </div>`;
   startCameraScan();
-  setTimeout(() => { const el = document.getElementById('scan-manual-input'); if(el) el.focus(); }, 50);
+  if(!window.matchMedia('(hover: none), (pointer: coarse)').matches) setTimeout(() => { const el = document.getElementById('scan-manual-input'); if(el) el.focus(); }, 50);
 }
 function closeScanner(){
   stopCameraScan();
