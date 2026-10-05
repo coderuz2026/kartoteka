@@ -176,6 +176,7 @@ function userError(message){ const e = new Error(message); e.userMessage = messa
 let commitBusy = false;
 async function commit(mutator){
   if(commitBusy) return {ok:false};
+  if(isReadOnly()){ toast('Режим просмотра — изменения недоступны'); return {ok:false}; }
   if(!cloud.enabled){
     // Apply to a copy so a failed validation leaves the real state untouched.
     const draft = JSON.parse(JSON.stringify(state));
@@ -219,8 +220,18 @@ const cloud = {
   error: '',
   mainDoc: undefined,  // undefined = not received yet, null = does not exist
   monthDocs: undefined,
+  roles: null,         // kartoteka_roles/roles: {editors: [emails], viewers: [emails]}
   unsub: [],
 };
+// Management sees everything but changes nothing. The Firestore rules are what really
+// block their writes; the app only hides the buttons and stops early with a message.
+function isReadOnly(){
+  if(!cloud.enabled || !cloud.user || !cloud.roles) return false;
+  const me = String(cloud.user.email || '').toLowerCase();
+  const list = k => (Array.isArray(cloud.roles[k]) ? cloud.roles[k] : []).map(x => String(x).toLowerCase());
+  return list('viewers').includes(me) && !list('editors').includes(me);
+}
+function rolesRef(){ return firebase.firestore().collection('kartoteka_roles').doc('roles'); }
 
 function splitState(s){
   const main = {};
@@ -300,6 +311,8 @@ function rebuildFromCloud(){
 function stopCloudListeners(){
   cloud.unsub.forEach(fn => { try{ fn(); }catch(e){} });
   cloud.unsub = [];
+  cloud.roles = null;
+  cloud.rolesReady = false;
   cloud.mainDoc = undefined;
   cloud.monthDocs = undefined;
   cloud.loaded = false;
@@ -309,7 +322,7 @@ function startCloudListeners(){
   const mainRef = firebase.firestore().collection('kartoteka').doc('main');
   const onError = e => {
     cloud.error = e.code === 'permission-denied'
-      ? `У аккаунта ${cloud.user ? cloud.user.email : ''} нет доступа к базе. Добавьте эту почту в правила Firestore.`
+      ? `У аккаунта ${cloud.user ? cloud.user.email : ''} нет доступа к базе. Попросите владельца добавить эту почту: Настройки → Доступ.`
       : 'Ошибка связи с базой: ' + (e.message || e);
     render();
   };
@@ -324,6 +337,12 @@ function startCloudListeners(){
     cloud.monthDocs = m;
     rebuildFromCloud();
   }, onError));
+  // Who may only look. Missing or unreadable (older rules) simply means «everyone edits».
+  cloud.unsub.push(rolesRef().onSnapshot(snap => {
+    cloud.roles = snap.exists ? snap.data() : null;
+    cloud.rolesReady = true;
+    render({keepScroll: true});
+  }, () => { cloud.roles = null; cloud.rolesReady = true; render({keepScroll: true}); }));
 }
 
 function initCloud(){
@@ -603,6 +622,47 @@ function opSign(h){ return {receive:'+', issue:'−', transfer:'→', return:'�
 function opColor(h){
   return {receive:'var(--ok-fg)', issue:'var(--crit-fg)', transfer:'var(--order-fg)', return:'var(--low-fg)', refill:'var(--low-fg)', scrap:'var(--faint)'}[h.type] || 'var(--faint)';
 }
+// Puts an entry into a cartridge's history (newest first) where its date belongs and
+// refreshes every «остаток после» of that cartridge, so a record entered today for an
+// earlier day (from the paper notebook) shows the balance of that day. Call it after
+// the stock numbers were changed.
+function addHistoryEntry(st, c, entry){
+  const list = st.history[c.id] || (st.history[c.id] = []);
+  let i = list.findIndex(h => h.date <= entry.date);
+  if(i === -1) i = list.length;
+  list.splice(i, 0, entry);
+  recomputeResults(st, c);
+}
+function recomputeResults(st, c){
+  const list = st.history[c.id] || [];
+  // Balance before the oldest entry = today's stock minus every recorded change.
+  const bal = {};
+  st.warehouses.forEach(w => { bal[w.id] = whStock(c, w.id); });
+  list.forEach(h => Object.entries(entryDeltas(h)).forEach(([w, v]) => { bal[w] = (bal[w] || 0) - v; }));
+  for(let i = list.length - 1; i >= 0; i--){
+    const h = list[i];
+    Object.entries(entryDeltas(h)).forEach(([w, v]) => { bal[w] = (bal[w] || 0) + v; });
+    if(h.type === 'transfer'){ h.result = bal[h.from || MAIN_WH] || 0; h.resultTo = bal[h.to] || 0; }
+    else h.result = bal[h.wh || MAIN_WH] || 0;
+  }
+}
+// The date chosen in a form: a real day, not in the future; otherwise today.
+function opDate(v){
+  const t = todayIso();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v || '') && v <= t ? v : t;
+}
+// «Последние операции» shows the clock time for today's records and the day for back-dated ones.
+function activityStamp(date){ return date === todayIso() ? nowLabel() : fmtDate(date); }
+// A date field for the operation forms; stateExpr is the global holding the form state.
+function dateFieldTemplate(stateExpr, value, label){
+  const t = todayIso();
+  return `
+    <div class="field">
+      <span class="field-lbl">${label || 'Дата'}</span>
+      <input class="input" type="date" max="${t}" value="${escapeHtml(value || t)}" onchange="${stateExpr}.date=this.value">
+      ${value && value !== t ? `<div class="field-hint">Запись задним числом — остатки пересчитаются по датам.</div>` : ''}
+    </div>`;
+}
 // Whether an entry is about one cartridge's barcode.
 function entryHasCode(h, code){ return Array.isArray(h.codes) && h.codes.includes(code); }
 
@@ -711,7 +771,7 @@ function rowTemplate(c){
       ${inBranches.length ? `<div class="c-wh">В филиалах: ${escapeHtml(inBranches.join(' · '))}</div>` : ''}
     </div>
     <div class="c-stock"><b style="color:${st==='ok' ? 'var(--text)' : meta.bar}">${c.stock}</b><span>шт.</span></div>
-    <div class="c-quick">
+    <div class="c-quick edit-only">
       <button class="q-btn q-in" title="Приход" aria-label="Приход ${escapeHtml(c.name)}" onclick="event.stopPropagation();openMovement('${c.id}','receive')">+</button>
       <button class="q-btn q-out" title="Расход" aria-label="Расход ${escapeHtml(c.name)}" onclick="event.stopPropagation();openMovement('${c.id}','issue')">−</button>
     </div>
@@ -736,7 +796,7 @@ function activityRowTemplate(a){
 }
 
 function monthTotals(){
-  const prefix = new Date().toISOString().slice(0,7);
+  const prefix = todayIso().slice(0,7);
   let inQty = 0, outQty = 0;
   Object.values(state.history).forEach(list => list.forEach(h => {
     if(!h.date.startsWith(prefix)) return;
@@ -748,7 +808,7 @@ function monthTotals(){
 // This month's flows per warehouse: in = from supplier, got = received from another
 // warehouse, sent = handed to another warehouse, out = installed (расход).
 function monthFlows(){
-  const prefix = new Date().toISOString().slice(0,7);
+  const prefix = todayIso().slice(0,7);
   const flows = {};
   const f = id => flows[id] || (flows[id] = {in:0, got:0, sent:0, out:0});
   Object.values(state.history).forEach(list => list.forEach(h => {
@@ -796,21 +856,59 @@ function filterChipsTemplate(){
 function refillOverviewTemplate(){
   const empty = state.units.filter(u => u.status === 'empty');
   const away = state.units.filter(u => u.status === 'refill');
+  const inPrinters = state.units.filter(u => u.status === 'installed');
   // Always shown, so the refill buttons are easy to find even while nothing is empty yet.
-  const card = (title, list, color, btn) => `
+  // viewOk: the button only shows information, so management sees it too.
+  const card = (title, list, color, btn, viewOk) => `
     <div class="card refill-card">
       <div><div class="refill-num" style="color:${list.length ? color : 'var(--faint)'}">${list.length}<small>шт.</small></div><div class="refill-title">${title}</div></div>
-      ${btn}
+      <div class="${viewOk ? '' : 'edit-only'}">${btn}</div>
     </div>`;
   return `
     <div class="section">
-      <div class="section-head"><h2>Пустые и заправка</h2></div>
-      <p class="field-hint" style="margin:0 0 12px">1) Сняли пустой из принтера → «Принять пустой». 2) Отдаёте фирме → «Отправить на заправку». 3) Фирма вернула заправленные → «Вернулись с заправки» — они снова в наличии.</p>
+      <div class="section-head"><h2>В принтерах, пустые и заправка</h2></div>
+      <p class="field-hint edit-only" style="margin:0 0 12px">1) Сняли пустой из принтера → «Принять пустой». 2) Отдаёте фирме → «Отправить на заправку». 3) Фирма вернула заправленные → «Вернулись с заправки» — они снова в наличии.</p>
       <div class="refill-grid">
+        ${card('Стоят в принтерах', inPrinters, 'var(--order-fg)', `<button class="btn-secondary" onclick="openInstalledList()" ${inPrinters.length ? '' : 'disabled'}>Где стоят</button>`, true)}
         ${card('Пустые — ждут заправки', empty, 'var(--crit-fg)', `<div class="refill-btns"><button class="btn-primary" onclick="openEmptyReturn()">${ICONS.plus}Принять пустой</button><button class="btn-secondary" onclick="openRefill('send')">Отправить на заправку</button></div>`)}
         ${card('Сейчас на заправке', away, 'var(--low-fg)', `<button class="btn-secondary" onclick="openRefill('back')">Вернулись с заправки</button>`)}
       </div>
     </div>`;
+}
+
+// Every barcoded cartridge now standing in a printer, grouped by the branch the printer is in.
+function openInstalledList(){
+  const units = state.units.filter(u => u.status === 'installed');
+  if(!units.length){ toast('Сейчас в принтерах нет картриджей со штрих-кодом'); return; }
+  const printerOf = u => state.printers.find(p => p.id === u.printerId);
+  const whOf = u => { const p = printerOf(u); return p && activeWarehouses().some(w => w.id === p.wh) ? p.wh : ''; };
+  const groups = activeWarehouses().map(w => ({title: w.name, list: units.filter(u => whOf(u) === w.id)}));
+  groups.push({title: 'Склад не указан', list: units.filter(u => !whOf(u))});
+  const row = u => {
+    const c = state.cartridges.find(x => x.id === u.cid);
+    const p = printerOf(u);
+    return `
+      <button class="installed-row" onclick="openUnitCard(${jsArg(u.code)})">
+        <span class="chip" style="background:${c ? colorHexOf(c) : 'var(--faint)'}"></span>
+        <span class="installed-main">
+          <b>${escapeHtml(p ? p.name : 'Принтер не указан')}${p && p.location ? ` — ${escapeHtml(p.location)}` : ''}</b>
+          <span class="t-sub">${escapeHtml(c ? c.name : '?')} · <span class="mono">${escapeHtml(u.code)}</span> · с ${u.since ? fmtDate(u.since) : '—'}${u.by ? ' · ' + escapeHtml(u.by) : ''}</span>
+        </span>
+      </button>`;
+  };
+  document.getElementById('modal-root').innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) this.remove()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1>Стоят в принтерах · ${units.length}</h1>
+        <button class="icon-btn" aria-label="Закрыть" onclick="document.getElementById('modal-root').innerHTML=''">${ICONS.x}</button>
+      </div>
+      <p style="margin:6px 0 10px;font-size:15px;color:var(--faint)">Нажмите на строку — откроется история картриджа.</p>
+      ${groups.filter(g => g.list.length).map(g => `
+        <div class="unit-group-head" style="margin-top:14px">${escapeHtml(g.title)} · ${g.list.length}</div>
+        ${g.list.sort((a,b) => (printerOf(a) || {name:''}).name.localeCompare((printerOf(b) || {name:''}).name)).map(row).join('')}`).join('')}
+    </div>
+  </div>`;
 }
 
 /* ---------- views ---------- */
@@ -824,15 +922,15 @@ function renderDashboardView(){
 
   return `
   <div class="topbar">
-    <div><h1>Главная</h1><p class="sub">${todayLabel()}${cloud.enabled ? ` · <span class="cloud-on">${ICONS.cloud} общая база</span>` : ''}</p></div>
+    <div><h1>Главная</h1><p class="sub">${todayLabel()}${cloud.enabled ? ` · <span class="cloud-on">${ICONS.cloud} общая база</span>` : ''}${isReadOnly() ? ` · <span class="ro-badge">только просмотр</span>` : ''}</p></div>
     <button class="btn-secondary" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
   </div>
   <div class="content">
     ${uploadLocalCardTemplate()}
     <div class="big-actions ${hasBranches ? 'four' : ''}">
-      <button class="big-btn big-in" onclick="openMovement(null,'receive')">${ICONS.plus}Приход</button>
-      <button class="big-btn big-out" onclick="openMovement(null,'issue')">${ICONS.minus}Расход</button>
-      ${hasBranches ? `<button class="big-btn big-move" onclick="openMovement(null,'transfer')">${ICONS.transfer}В филиал</button>` : ''}
+      <button class="big-btn big-in edit-only" onclick="openMovement(null,'receive')">${ICONS.plus}Приход</button>
+      <button class="big-btn big-out edit-only" onclick="openMovement(null,'issue')">${ICONS.minus}Расход</button>
+      ${hasBranches ? `<button class="big-btn big-move edit-only" onclick="openMovement(null,'transfer')">${ICONS.transfer}В филиал</button>` : ''}
       <button class="big-btn big-scan" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}<span>Сканировать<span class="desk-inline"> штрих-код</span></span></button>
     </div>
 
@@ -852,7 +950,7 @@ function renderDashboardView(){
       <div class="row-list empty-state">
         <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>
         Добавьте свои картриджи — после этого здесь появятся остатки и операции.
-        <div style="margin-top:16px"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div>
+        <div style="margin-top:16px" class="edit-only"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div>
       </div>
     </div>` : `
     <div class="section">
@@ -877,7 +975,7 @@ function renderInventoryView(){
     <div class="topbar-actions">
       <div class="search-box">${ICONS.search}<input id="inv-search" placeholder="Название или штрих-код" value="${escapeHtml(searchQuery)}"></div>
       <button class="icon-btn desk-only" title="Сканировать штрих-код" aria-label="Сканировать штрих-код" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}</button>
-      <button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button>
+      <button class="btn-primary edit-only" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button>
     </div>
   </div>
   <div class="content">
@@ -919,7 +1017,7 @@ function renderDetailView(id){
           <div style="font-size:15px;color:var(--faint);margin-top:4px">${escapeHtml(cartridgeSub(c))}</div>
         </div>
       </div>
-      <div class="detail-actions">
+      <div class="detail-actions edit-only">
         <button class="icon-btn" title="Редактировать" onclick="openCartridgeEdit('${c.id}')">${ICONS.edit}</button>
         <button class="btn-primary btn-in" onclick="openMovement('${c.id}','receive')">${ICONS.plus}Приход</button>
         ${branchList().length ? `<button class="btn-primary btn-move" onclick="openMovement('${c.id}','transfer')">${ICONS.transfer}В филиал</button>` : ''}
@@ -983,7 +1081,7 @@ function unitsCardTemplate(c){
           ${g.list.map(u => `<button class="unit-row" onclick="openUnitCard(${jsArg(u.code)})"><span class="mono">${escapeHtml(u.code)}</span><span class="unit-where">${escapeHtml(where(u))}${u.since ? ' · с ' + fmtDate(u.since) : ''}</span></button>`).join('')}
         </div>`).join('')
         : `<p style="font-size:14px;color:var(--faint);margin:8px 0 0">Пока нет. При приходе отсканируйте штрих-код каждого картриджа — тогда видно, где каждый из них и когда его ставили.</p>`}
-      ${legacy ? `<div class="warn-box" style="margin-top:12px;display:block"><span>Штрих-код <b class="mono">${escapeHtml(c.barcode)}</b> записан на всю модель. Если это код одного конкретного картриджа — </span><button class="btn-secondary" style="margin-top:8px" onclick="convertModelBarcode('${c.id}')">Сделать его кодом картриджа</button></div>` : ''}
+      ${legacy ? `<div class="warn-box edit-only" style="margin-top:12px;display:block"><span>Штрих-код <b class="mono">${escapeHtml(c.barcode)}</b> записан на всю модель. Если это код одного конкретного картриджа — </span><button class="btn-secondary" style="margin-top:8px" onclick="convertModelBarcode('${c.id}')">Сделать его кодом картриджа</button></div>` : ''}
     </div>`;
 }
 // Turns a barcode that was saved on the whole model (older versions) into one
@@ -1005,7 +1103,7 @@ async function convertModelBarcode(cid){
 function printerCardTemplate(p){
   const installs = printerInstalls(p.id);
   const nowIn = state.units.filter(u => u.status === 'installed' && u.printerId === p.id);
-  const month = new Date().toISOString().slice(0,7);
+  const month = todayIso().slice(0,7);
   const monthQty = installs.filter(x => x.h.date.startsWith(month)).reduce((s,x) => s + x.h.qty, 0);
   const totalQty = installs.reduce((s,x) => s + x.h.qty, 0);
   const byCartridge = {};
@@ -1022,7 +1120,7 @@ function printerCardTemplate(p){
           <div style="font-size:13px;color:var(--faint)">${escapeHtml(sub)}</div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div class="edit-only" style="display:flex;gap:6px;flex-shrink:0">
         <button class="btn-secondary p-empty-btn" title="Снять пустой картридж из этого принтера" onclick="openEmptyReturn('${p.id}')">↩ Снять пустой</button>
         <button class="icon-btn" style="width:40px;height:40px" title="Изменить" aria-label="Изменить принтер" onclick="openPrinterModal('${p.id}')">${ICONS.edit}</button>
         <button class="icon-btn" style="width:40px;height:40px" title="Удалить" aria-label="Удалить принтер" onclick="deletePrinter('${p.id}')">${ICONS.trash}</button>
@@ -1053,7 +1151,7 @@ function renderPrintersView(){
     <div><h1>Принтеры</h1><p class="sub">${printers.length} ${plural(printers.length, 'принтер', 'принтера', 'принтеров')} · сколько картриджей куда установлено</p></div>
     <div class="topbar-actions">
       <button class="btn-secondary" onclick="openReport()">${ICONS.excel}Отчёт в Excel</button>
-      <button class="btn-primary" onclick="openPrinterModal()">${ICONS.plus}Добавить принтер</button>
+      <button class="btn-primary edit-only" onclick="openPrinterModal()">${ICONS.plus}Добавить принтер</button>
     </div>
   </div>
   <div class="content">${body || `<div class="card empty-state">Принтеров пока нет — нажмите «Добавить принтер»</div>`}</div>`;
@@ -1244,7 +1342,7 @@ function renderWarehousesView(){
   return `
   <div class="topbar">
     <div><h1>Склады</h1><p class="sub">${escapeHtml(whName(MAIN_WH))} — основной склад, остальные — филиалы</p></div>
-    <button class="btn-secondary" onclick="addBranch()">${ICONS.plus}Добавить филиал</button>
+    <button class="btn-secondary edit-only" onclick="addBranch()">${ICONS.plus}Добавить филиал</button>
   </div>
   <div class="content">
     <div class="section">${warehouseCardsTemplate()}</div>
@@ -1278,7 +1376,7 @@ function whRowTemplate(c, wh){
       <div class="c-sub">${escapeHtml(cartridgeSub(c))}</div>
     </div>
     <div class="c-stock"><b>${n}</b><span>шт.</span></div>
-    <div class="c-quick">
+    <div class="c-quick edit-only">
       <button class="q-btn ${isMain ? 'q-in' : 'q-move'}" title="${isMain ? 'Приход' : 'Получить с ' + escapeHtml(whName(MAIN_WH))}" onclick="event.stopPropagation();${plusAction}">+</button>
       <button class="q-btn q-out" title="Расход" onclick="event.stopPropagation();openMovement('${c.id}','issue',{wh:'${wh}'})">−</button>
     </div>
@@ -1300,7 +1398,7 @@ function renderWarehouseView(id){
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h1 style="font-size:26px">${escapeHtml(w.name)}</h1><span class="wh-tag ${isMain ? 'wh-tag-main' : ''}">${isMain ? 'Основной склад' : 'Филиал'}</span></div>
         <p style="margin:4px 0 0;font-size:15px;color:var(--faint)">${total} шт. · ${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</p>
       </div>
-      <div class="detail-actions">
+      <div class="detail-actions edit-only">
         <button class="icon-btn" title="Переименовать" aria-label="Переименовать склад" onclick="renameWarehouse('${w.id}')">${ICONS.edit}</button>
         ${isMain ? '' : `<button class="icon-btn" title="Удалить филиал" aria-label="Удалить филиал" onclick="deleteWarehouse('${w.id}')">${ICONS.trash}</button>`}
         ${isMain
@@ -1384,15 +1482,16 @@ function renderSettingsView(){
         <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Сохраните все данные в файл на всякий случай. Из файла их можно вернуть.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn-secondary" onclick="downloadBackup()">Сохранить копию в файл</button>
-          <label class="btn-secondary" style="cursor:pointer">Восстановить из файла<input type="file" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)"></label>
+          <label class="btn-secondary edit-only" style="cursor:pointer">Восстановить из файла<input type="file" accept=".json,application/json" style="display:none" onchange="restoreBackup(this)"></label>
         </div>
       </div>
-      <div class="card" style="padding:22px">
+      ${accessCardTemplate()}
+      <div class="card edit-only" style="padding:22px">
         <h2 style="font-size:20px;margin-bottom:8px">Начать с нуля</h2>
         <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Удаляет все картриджи, принтеры и историю${cloud.enabled ? ' — <b>на всех устройствах</b>' : ''}. Дальше добавляйте свои картриджи кнопкой «Новый картридж».</p>
         <button class="btn-primary btn-out" onclick="resetData('empty')">${ICONS.trash} Очистить всё</button>
       </div>
-      <div class="card" style="padding:22px">
+      <div class="card edit-only" style="padding:22px">
         <h2 style="font-size:20px;margin-bottom:8px">Демо-данные</h2>
         <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Заменяет всё на 11 примерных картриджей — чтобы посмотреть, как работает приложение.</p>
         <button class="btn-secondary" onclick="resetData('demo')">Загрузить демо-данные</button>
@@ -1407,11 +1506,53 @@ function uploadLocalCardTemplate(){
   const local = loadLocal();
   if(!local || !local.cartridges.length) return '';
   return `
-  <div class="card upload-card">
+  <div class="card upload-card edit-only">
     <h2 style="font-size:19px;margin-bottom:6px">Общая база пока пустая</h2>
     <p style="font-size:15px;color:var(--muted);margin:0 0 14px">На этом устройстве сохранены ваши прежние данные: ${local.cartridges.length} картриджей, ${local.printers.length} принтеров. Загрузите их в общую базу — после этого они появятся на всех устройствах.</p>
     <button class="btn-primary btn-in" onclick="uploadLocalToCloud()">${ICONS.cloud} Загрузить в общую базу</button>
   </div>`;
+}
+
+// Who may change data and who (management) may only look. Kept in its own Firestore
+// document; the Firestore rules let only the owner write it and enforce the read-only part.
+function accessCardTemplate(){
+  if(!cloud.enabled) return '';
+  const r = cloud.roles || {};
+  const list = (key, title, hint) => {
+    const emails = Array.isArray(r[key]) ? r[key] : [];
+    return `
+      <div class="field">
+        <span class="field-lbl">${title}</span>
+        <div class="field-hint" style="margin:0 0 8px">${hint}</div>
+        ${emails.length ? emails.map(e => `<div class="access-row"><span>${escapeHtml(e)}</span><button class="icon-btn" style="width:36px;height:36px" aria-label="Убрать" onclick="changeAccess('${key}', ${jsArg(e)}, false)">${ICONS.x}</button></div>`).join('') : `<div class="field-hint" style="margin:0 0 8px">Пока никого</div>`}
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input class="input" id="access-${key}" type="email" inputmode="email" placeholder="почта@пример.uz" style="flex:1;min-width:0">
+          <button class="btn-secondary" onclick="changeAccess('${key}', document.getElementById('access-${key}').value, true)">Добавить</button>
+        </div>
+      </div>`;
+  };
+  return `
+    <div class="card edit-only" style="padding:22px">
+      <h2 style="font-size:20px;margin-bottom:8px">Доступ</h2>
+      <p style="font-size:15px;color:var(--muted);margin:0 0 16px">Аккаунт (почта и пароль) сначала создаётся в Firebase → Authentication. Потом впишите почту сюда.</p>
+      ${list('viewers', 'Руководство — только просмотр', 'Видят всё: остатки, историю, отчёты. Ничего не могут изменить.')}
+      ${list('editors', 'Сотрудники — могут вносить изменения', 'Приход, расход, заправка и всё остальное. Владелец базы может всегда, его вписывать не нужно.')}
+    </div>`;
+}
+async function changeAccess(key, raw, add){
+  const email = String(raw || '').trim().toLowerCase();
+  if(add && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Введите почту полностью, например boss@mail.uz'); return; }
+  if(!add && !confirm(`Убрать ${email} из списка?`)) return;
+  try{
+    const FV = firebase.firestore.FieldValue;
+    const other = key === 'viewers' ? 'editors' : 'viewers';
+    // One person is either management or staff, not both.
+    const update = add ? {[key]: FV.arrayUnion(email), [other]: FV.arrayRemove(email)} : {[key]: FV.arrayRemove(email)};
+    await rolesRef().set(update, {merge: true});
+    toast(add ? `Добавлено: ${email}` : `Убрано: ${email}`);
+  }catch(e){
+    toast(e.code === 'permission-denied' ? 'Менять доступ может только владелец базы (проверьте правила Firestore)' : 'Не удалось сохранить: ' + (e.message || e));
+  }
 }
 
 function renderLoginView(){
@@ -1449,7 +1590,7 @@ function updateInventoryList(){
   const body = document.getElementById('inv-list-body');
   if(!body) return;
   if(!state.cartridges.length){
-    body.innerHTML = `<div class="empty-state"><div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>Добавьте первый картридж — вручную или отсканируйте штрих-код.<div style="margin-top:16px"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div></div>`;
+    body.innerHTML = `<div class="empty-state"><div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>Добавьте первый картридж — вручную или отсканируйте штрих-код.<div style="margin-top:16px" class="edit-only"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div></div>`;
     return;
   }
   body.innerHTML = list.length ? list.map(rowTemplate).join('') : `<div class="empty-state">Ничего не найдено</div>`;
@@ -1494,6 +1635,7 @@ function openMovement(id, type, opts){
     codes: [],        // barcodes of the individual cartridges in this operation
     info: null,       // {text, bad} about the last scanned barcode
     returnOld: true,  // расход: the cartridge taken out of the printer goes back as empty
+    date: todayIso(), // can be an earlier day when copying records from the notebook
   };
   (opts.codes || []).forEach(code => addMovementCode(code, true));
   renderModal();
@@ -1597,10 +1739,10 @@ function oldUnitsInPrinter(m){
 function setMovementPrinter(id){
   if(!modalState) return;
   modalState.printerId = id;
-  // A printer standing in a branch is fed from that branch's shelf.
+  // A printer standing in a branch is fed from that branch's shelf — unless a scanned
+  // cartridge already says which shelf it comes from.
   const p = state.printers.find(x => x.id === id);
-  if(p && activeWarehouses().some(w => w.id === p.wh)) modalState.wh = p.wh;
-  pruneMovementCodes();
+  if(!modalState.codes.length && p && activeWarehouses().some(w => w.id === p.wh)) modalState.wh = p.wh;
   renderModal();
 }
 function printerOptionsTemplate(selectedId){
@@ -1756,6 +1898,7 @@ function renderModal(){
         <span class="field-lbl">Количество</span>
         ${qtyField}
       </div>
+      ${dateFieldTemplate('modalState', modalState.date)}
       <div class="field">
         <span class="field-lbl">${partyLabel}</span>
         <input class="input" value="${escapeHtml(modalState.party)}" oninput="modalState.party=this.value" placeholder="${partyHint}">
@@ -1800,8 +1943,8 @@ async function submitMovement(){
   const who = m.party.trim() || '—';
   const by = m.party.trim();
   const note = (m.note || '').trim();
-  const stamp = nowLabel();
-  const today = todayIso();
+  const today = opDate(m.date);
+  const stamp = activityStamp(today);
   const returnOld = t === 'issue' && !!m.printerId && m.returnOld;
   // Made outside the mutator so a retried cloud save gives the empty cartridge the same number.
   const emptyCode = 'БК-' + Math.random().toString(36).slice(2,7).toUpperCase();
@@ -1864,7 +2007,7 @@ async function submitMovement(){
             old.push(u);
           }
           if(old.length){
-            st.history[c.id].unshift({type:'return', wh: src, qty: old.length, result: have - qty, codes: old.map(u => u.code), printerId: printer.id, printerName: printer.name, date: today, who, dept: ''});
+            addHistoryEntry(st, c, {type:'return', wh: src, qty: old.length, result: have - qty, codes: old.map(u => u.code), printerId: printer.id, printerName: printer.name, date: today, who, dept: ''});
             message += ` · снятый пустой → ${nameOf(src)}`;
           }
         }
@@ -1879,7 +2022,7 @@ async function submitMovement(){
     }
     if(codes.length) entry.codes = codes.slice();
     Object.assign(entry, {date: today, who, dept: note});
-    st.history[c.id].unshift(entry);
+    addHistoryEntry(st, c, entry);
     st.activity.unshift({date: stamp, type: t, text: `${c.name} ×${qty}`, meta});
     st.activity = st.activity.slice(0,8);
     return message;
@@ -1904,6 +2047,7 @@ function openCartridgeCreate(barcode){
     type: 'toner', color: 'Чёрный',
     supplier: DEFAULT_SUPPLIER, location: DEFAULT_LOCATION,
     initialStock: 1, custom: false,
+    date: todayIso(),
   };
   renderCartridgeEditModal();
 }
@@ -1994,7 +2138,8 @@ function renderCartridgeEditModal(){
         <span class="field-lbl">Сколько штук на складе ${escapeHtml(whName(MAIN_WH))} (без штрих-кода)</span>
         <input class="input" type="number" min="0" inputmode="numeric" value="${s.initialStock}" oninput="setCartridgeEditField('initialStock', Math.max(0, Math.floor(Number(this.value)||0)))">
       </div>
-      <div class="warn-box" id="cart-one-note" style="margin-bottom:14px;${s.barcode.trim() ? '' : 'display:none'}"><span>Добавится <b style="color:var(--text)">1 шт.</b> на склад ${escapeHtml(whName(MAIN_WH))} с этим штрих-кодом</span></div>` : ''}
+      <div class="warn-box" id="cart-one-note" style="margin-bottom:14px;${s.barcode.trim() ? '' : 'display:none'}"><span>Добавится <b style="color:var(--text)">1 шт.</b> на склад ${escapeHtml(whName(MAIN_WH))} с этим штрих-кодом</span></div>
+      ${dateFieldTemplate('cartridgeEditState', s.date, 'Дата прихода')}` : ''}
 
       <div style="display:flex;gap:14px;flex-wrap:wrap">
         <div class="field" style="flex:1;min-width:180px">
@@ -2025,8 +2170,8 @@ async function submitCartridgeEdit(){
   const isNew = s.isNew;
   // Made outside the mutator so a retried cloud save doesn't create two cartridges.
   const newId = isNew ? name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6) : null;
-  const stamp = nowLabel();
-  const today = todayIso();
+  const today = isNew ? opDate(s.date) : todayIso();
+  const stamp = activityStamp(today);
   const fields = {
     name,
     type: s.type, typeLabel: TYPE_LABELS[s.type],
@@ -2059,7 +2204,7 @@ async function submitCartridgeEdit(){
       const who = fields.supplier || 'Начальный остаток';
       const entry = {date: today, type:'receive', wh: MAIN_WH, qty, result: c.stock, who, dept: ''};
       if(barcode) entry.codes = [barcode];
-      st.history[c.id].unshift(entry);
+      addHistoryEntry(st, c, entry);
       st.activity.unshift({date: stamp, type:'receive', text:`${name} ×${qty}`, meta: who});
       st.activity = st.activity.slice(0,8);
     }
@@ -2093,7 +2238,8 @@ async function deleteCartridge(id){
 /* ---------- excel report ---------- */
 let reportState = null;
 
-function todayIso(){ return new Date().toISOString().slice(0,10); }
+// Local calendar day (toISOString alone would give yesterday's date before 5 a.m. in Tashkent).
+function todayIso(){ const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10); }
 function reportPreset(kind){
   const t = todayIso();
   const y = Number(t.slice(0,4)), m = Number(t.slice(5,7));
@@ -2342,7 +2488,7 @@ function downloadReport(){
 // Runs inside commit(); one history entry per cartridge model. Returns a message.
 const UNIT_ACTION_FROM = {return: ['installed'], refill: ['empty'], back: ['refill', 'empty'], scrap: ['empty', 'refill']};
 function applyUnitAction(st, codes, action, opts){
-  const today = todayIso();
+  const today = opDate(opts.date);
   const nameOf = id => { const w = st.warehouses.find(x => x.id === (id || MAIN_WH)); return w ? w.name : 'Склад удалён'; };
   const units = codes.map(code => {
     const u = findUnit(st, code);
@@ -2387,9 +2533,8 @@ function applyUnitAction(st, codes, action, opts){
       Object.assign(entry, {wh, result: whStock(c, wh)});
       meta = 'Списан';
     }
-    if(!st.history[cid]) st.history[cid] = [];
-    st.history[cid].unshift(entry);
-    st.activity.unshift({date: nowLabel(), type: entry.type, text: `${c.name} ×${qty}`, meta});
+    addHistoryEntry(st, c, entry);
+    st.activity.unshift({date: activityStamp(today), type: entry.type, text: `${c.name} ×${qty}`, meta});
   });
   st.activity = st.activity.slice(0,8);
   const word = `${total} ${plural(total, 'картридж', 'картриджа', 'картриджей')}`;
@@ -2405,7 +2550,7 @@ function openUnitCard(code){
   const p = u.status === 'installed' && state.printers.find(x => x.id === u.printerId);
   const live = id => activeWarehouses().some(w => w.id === id);
   const wh = u.status === 'installed' ? (p && live(p.wh) ? p.wh : live(u.wh) ? u.wh : MAIN_WH) : MAIN_WH;
-  unitCardState = {code: u.code, wh, firm: defaultFirm()};
+  unitCardState = {code: u.code, wh, firm: defaultFirm(), date: todayIso()};
   renderUnitCard();
 }
 function closeUnitCard(){
@@ -2461,7 +2606,8 @@ function renderUnitCard(){
         <b style="color:${meta.color}">${meta.label}</b>
         <span>${escapeHtml(unitWhere(u))}</span>
       </div>
-      ${actions}
+      ${['installed', 'empty', 'refill'].includes(u.status) ? `<div class="edit-only">${dateFieldTemplate('unitCardState', s.date)}</div>` : ''}
+      ${actions ? `<div class="edit-only">${actions}</div>` : ''}
       <h2 style="font-size:17px;margin:18px 0 8px">История этого картриджа</h2>
       <div class="unit-hist">
         ${hist.length ? hist.map(h => `
@@ -2480,7 +2626,7 @@ async function submitUnitAction(action){
   const firm = (s.firm || '').trim();
   if(action === 'refill' && !firm){ toast('Укажите фирму, которая заправляет'); return; }
   if(action === 'scrap' && !confirm(`Списать картридж ${s.code}? Он больше не будет числиться ни на складе, ни на заправке.`)) return;
-  const {ok, result} = await commit(st => applyUnitAction(st, [s.code], action, {wh: s.wh, firm}));
+  const {ok, result} = await commit(st => applyUnitAction(st, [s.code], action, {wh: s.wh, firm, date: s.date}));
   if(!ok) return;
   if(action === 'refill') setPref('lastFirm', firm);
   toast(result);
@@ -2495,7 +2641,7 @@ function openRefill(mode){
   const list = refillCandidates(mode);
   if(!list.length){ toast(mode === 'send' ? 'Пустых картриджей нет' : 'На заправке ничего нет'); return; }
   modalState = null; printerModalState = null; cartridgeEditState = null; unitCardState = null; emptyState = null;
-  refillState = {mode, picked: list.map(u => u.code), firm: defaultFirm(), wh: MAIN_WH};
+  refillState = {mode, picked: list.map(u => u.code), firm: defaultFirm(), wh: MAIN_WH, date: todayIso()};
   renderRefillModal();
 }
 function closeRefill(){
@@ -2533,6 +2679,7 @@ function renderRefillModal(){
       ${send
         ? `<div class="field"><span class="field-lbl">Фирма, которая заправляет</span><input class="input" value="${escapeHtml(s.firm)}" oninput="refillState.firm=this.value"></div>`
         : `<div class="field"><span class="field-lbl">Положить на склад</span><div class="wh-chips">${activeWarehouses().map(w => `<button class="filter-chip ${s.wh===w.id?'active':''}" onclick="refillState.wh='${w.id}';renderRefillModal()">${escapeHtml(w.name)}</button>`).join('')}</div></div>`}
+      ${dateFieldTemplate('refillState', s.date, send ? 'Дата, когда отдали' : 'Дата, когда вернули')}
       <div class="modal-foot">
         <button class="btn-secondary" onclick="closeRefill()">Отмена</button>
         <button class="btn-primary ${send ? '' : 'btn-in'}" onclick="submitRefill()">${ICONS.check}${send ? 'Отдать' : 'Принять'}: <span id="refill-submit-count">${s.picked.length}</span> шт.</button>
@@ -2547,7 +2694,7 @@ async function submitRefill(){
   const firm = (s.firm || '').trim();
   if(s.mode === 'send' && !firm){ toast('Укажите фирму, которая заправляет'); return; }
   const codes = s.picked.slice();
-  const {ok, result} = await commit(st => applyUnitAction(st, codes, s.mode === 'send' ? 'refill' : 'back', {wh: s.wh, firm}));
+  const {ok, result} = await commit(st => applyUnitAction(st, codes, s.mode === 'send' ? 'refill' : 'back', {wh: s.wh, firm, date: s.date}));
   if(!ok) return;
   if(s.mode === 'send') setPref('lastFirm', firm);
   closeRefill();
@@ -2563,7 +2710,7 @@ let emptyState = null; // {printerId, picked: [codes], code, cid, wh}
 function openEmptyReturn(printerId){
   if(!state.cartridges.length){ toast('Сначала добавьте картридж'); return; }
   modalState = null; printerModalState = null; cartridgeEditState = null; unitCardState = null; refillState = null;
-  emptyState = {printerId: '', picked: [], code: '', cid: state.cartridges[0].id, wh: MAIN_WH};
+  emptyState = {printerId: '', picked: [], code: '', cid: state.cartridges[0].id, wh: MAIN_WH, date: todayIso()};
   if(printerId) setEmptyPrinter(printerId, true);
   renderEmptyModal();
 }
@@ -2654,6 +2801,7 @@ function renderEmptyModal(){
         <span class="field-lbl">Положить на склад</span>
         <div class="wh-chips">${activeWarehouses().map(w => `<button class="filter-chip ${s.wh===w.id?'active':''}" onclick="emptyState.wh='${w.id}';renderEmptyModal()">${escapeHtml(w.name)}</button>`).join('')}</div>
       </div>
+      ${dateFieldTemplate('emptyState', s.date, 'Дата, когда сняли')}
       <div class="modal-foot">
         <button class="btn-secondary" onclick="closeEmptyReturn()">Отмена</button>
         <button class="btn-primary" onclick="submitEmptyReturn()">${ICONS.check}Принять пустой${s.picked.length > 1 ? ` (${s.picked.length})` : ''}</button>
@@ -2668,13 +2816,13 @@ async function submitEmptyReturn(){
   const typed = (s.code || '').trim();
   const code = typed || 'БК-' + Math.random().toString(36).slice(2,7).toUpperCase();
   const {printerId, cid, wh} = s;
-  const today = todayIso();
-  const stamp = nowLabel();
+  const today = opDate(s.date);
+  const stamp = activityStamp(today);
   const {ok, result} = await commit(st => {
-    if(picked.length) return applyUnitAction(st, picked, 'return', {wh});
+    if(picked.length) return applyUnitAction(st, picked, 'return', {wh, date: today});
     const known = findUnit(st, code);
     if(known){
-      if(known.status === 'installed') return applyUnitAction(st, [code], 'return', {wh});
+      if(known.status === 'installed') return applyUnitAction(st, [code], 'return', {wh, date: today});
       throw userError(`Картридж ${code} сейчас ${UNIT_STATUS[known.status].label.toLowerCase()} — принять пустым нельзя`);
     }
     const owner = codeOwner(st, code);
@@ -2686,8 +2834,7 @@ async function submitEmptyReturn(){
     st.units.push({code, cid, status:'empty', wh, since: today});
     const entry = {date: today, type:'return', wh, qty: 1, result: whStock(c, wh), codes: [code], who: '—', dept: ''};
     if(p) Object.assign(entry, {printerId: p.id, printerName: p.name});
-    if(!st.history[cid]) st.history[cid] = [];
-    st.history[cid].unshift(entry);
+    addHistoryEntry(st, c, entry);
     const whLabel = (st.warehouses.find(w => w.id === wh) || {}).name || '';
     st.activity.unshift({date: stamp, type:'return', text:`${c.name} ×1`, meta:`Снят пустой → ${whLabel}${p ? ' · ' + p.name : ''}`});
     st.activity = st.activity.slice(0,8);
@@ -2712,6 +2859,12 @@ function onBarcodeScanned(code){
   // A cartridge with its own barcode: show where it is and what can be done with it.
   if(findUnit(state, code)){ openUnitCard(code); return; }
   const c = findCartridgeByBarcode(code);
+  if(isReadOnly()){
+    document.getElementById('modal-root').innerHTML = '';
+    if(c) location.hash = '#/detail/' + c.id;
+    else toast(`Штрих-код «${code}» не найден`);
+    return;
+  }
   if(c){
     openMovement(c.id, 'issue');
     toast(`Найден: ${c.name}`);
@@ -2946,9 +3099,16 @@ function render(opts){
     if(cloud.error) gate = renderMessageView('Нет доступа к данным', escapeHtml(cloud.error));
     else if(!cloud.authChecked) gate = renderMessageView('Загрузка…', 'Подключаемся к общей базе');
     else if(!cloud.user) gate = renderLoginView();
-    else if(!cloud.loaded) gate = renderMessageView('Загрузка…', 'Получаем данные из общей базы');
+    else if(!cloud.loaded || !cloud.rolesReady) gate = renderMessageView('Загрузка…', 'Получаем данные из общей базы');
   }
   document.body.classList.toggle('locked', !!gate);
+  const readOnly = isReadOnly();
+  document.body.classList.toggle('readonly', readOnly);
+  // An edit form left open when the account turned read-only must not stay usable.
+  if(readOnly && (modalState || printerModalState || cartridgeEditState || refillState || emptyState)){
+    modalState = printerModalState = cartridgeEditState = refillState = emptyState = null;
+    document.getElementById('modal-root').innerHTML = '';
+  }
   if(gate){
     document.getElementById('view').innerHTML = gate;
     document.getElementById('modal-root').innerHTML = '';
