@@ -456,6 +456,64 @@ const FILTERS = [
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+function isTouchDevice(){
+  return !!(window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches);
+}
+
+/* ---------- name lists: pick from a dropdown or type your own ---------- */
+const PRINTER_MODELS = ['Canon MF 3010', 'Canon LBP 6030'];
+const CARTRIDGE_MODELS = ['325', '435', '725', '925'];
+const DEFAULT_SUPPLIER = 'DisTECH';
+const DEFAULT_LOCATION = '7 этаж склад';
+const OTHER_OPTION = '__other';
+
+function uniqueNames(list){
+  const seen = new Set();
+  return list.map(x => String(x || '').trim()).filter(x => {
+    const k = x.toLowerCase();
+    if(!x || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+// Built-in models first, then any model someone typed in for an earlier printer.
+function printerModelOptions(){
+  const own = state.printers.map(p => p.name).sort((a,b) => a.localeCompare(b));
+  return uniqueNames([...PRINTER_MODELS, ...own]);
+}
+function cartridgeModelOptions(){
+  return uniqueNames(CARTRIDGE_MODELS);
+}
+function isCustomName(name, options){
+  return !!name && !options.some(o => o.toLowerCase() === name.trim().toLowerCase());
+}
+// kind is 'printer' or 'cartridge'; s.custom shows the text box for a name that isn't in the list.
+function nameFieldTemplate(kind, s, options, placeholder){
+  const selected = s.custom ? OTHER_OPTION : (options.find(o => o.toLowerCase() === s.name.trim().toLowerCase()) || '');
+  return `
+    <select class="input" onchange="pickName('${kind}', this.value)">
+      <option value="" disabled ${selected === '' ? 'selected' : ''}>— выберите из списка —</option>
+      ${options.map(o => `<option value="${escapeHtml(o)}" ${o === selected ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
+      <option value="${OTHER_OPTION}" ${selected === OTHER_OPTION ? 'selected' : ''}>✎ Другое — ввести вручную…</option>
+    </select>
+    ${s.custom ? `<input class="input" id="name-other-input" style="margin-top:8px" value="${escapeHtml(s.name)}" oninput="nameFieldState('${kind}').name=this.value" placeholder="${escapeHtml(placeholder)}">` : ''}`;
+}
+function nameFieldState(kind){
+  return kind === 'printer' ? printerModalState : cartridgeEditState;
+}
+function pickName(kind, value){
+  const s = nameFieldState(kind);
+  if(!s) return;
+  if(value === OTHER_OPTION){
+    s.custom = true;
+    s.name = '';
+  } else {
+    s.custom = false;
+    s.name = value;
+  }
+  if(kind === 'printer') renderPrinterModal(); else renderCartridgeEditModal();
+  if(s.custom){ const el = document.getElementById('name-other-input'); if(el) el.focus(); }
+}
 function todayLabel(){
   return new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
 }
@@ -870,6 +928,7 @@ function openPrinterModal(id){
   printerModalState = p
     ? {id: p.id, name: p.name, location: p.location || '', wh: p.wh || '', serial: p.serial === '—' ? '' : (p.serial || ''), notes: p.notes || ''}
     : {id: null, name:'', location:'', wh: MAIN_WH, serial:'', notes:''};
+  printerModalState.custom = isCustomName(printerModalState.name, printerModelOptions());
   renderPrinterModal();
 }
 function closePrinterModal(){
@@ -890,7 +949,7 @@ function renderPrinterModal(){
       </div>
       <div class="field" style="margin-top:18px">
         <span class="field-lbl">Принтер *</span>
-        <input class="input" value="${escapeHtml(s.name)}" oninput="printerModalState.name=this.value" placeholder="Например, HP LaserJet Pro M404dn">
+        ${nameFieldTemplate('printer', s, printerModelOptions(), 'Например, HP LaserJet Pro M404dn')}
       </div>
       <div class="field">
         <span class="field-lbl">Где стоит (склад / филиал)</span>
@@ -927,12 +986,15 @@ async function submitPrinter(){
   const s = printerModalState;
   if(!s) return;
   const name = s.name.trim();
-  if(!name){ toast('Укажите принтер'); return; }
-  const fields = {name, location: s.location.trim(), wh: s.wh, serial: s.serial.trim() || '—', notes: s.notes.trim()};
+  if(!name){ toast('Выберите принтер из списка или впишите свой'); return; }
+  const serial = s.serial.trim();
+  const fields = {name, location: s.location.trim(), wh: s.wh, serial: serial || '—', notes: s.notes.trim()};
   // The id is made outside the mutator so a retried cloud save doesn't create two printers.
   const newId = s.id ? null : 'p-' + name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '') + '-' + Math.random().toString(36).slice(2,6);
   const {ok} = await commit(st => {
-    if(st.printers.some(p => p.id !== s.id && p.name.toLowerCase() === name.toLowerCase())) throw userError('Такой принтер уже есть в списке');
+    // Several printers of the same model are normal (different rooms); only the serial number must be unique.
+    const twin = serial && st.printers.find(p => p.id !== s.id && p.serial === serial);
+    if(twin) throw userError(`Серийный номер ${serial} уже у принтера «${twin.name}»${twin.location ? ' — ' + twin.location : ''}`);
     if(s.id){
       const p = st.printers.find(x => x.id === s.id);
       if(!p) throw userError('Этот принтер уже удалён на другом устройстве');
@@ -1500,8 +1562,8 @@ function openCartridgeCreate(barcode){
     isNew: true, id: null,
     name: '', barcode: barcode || '',
     type: 'toner', color: 'Чёрный',
-    supplier: '', location: '',
-    initialStock: 0,
+    supplier: DEFAULT_SUPPLIER, location: DEFAULT_LOCATION,
+    initialStock: 0, custom: false,
   };
   renderCartridgeEditModal();
 }
@@ -1513,6 +1575,7 @@ function openCartridgeEdit(id){
     name: c.name, barcode: c.barcode || '',
     type: TYPE_LABELS[c.type] ? c.type : 'toner', color: normalizeColor(c.color),
     supplier: c.supplier || '', location: c.location || '',
+    custom: isCustomName(c.name, cartridgeModelOptions()),
   };
   renderCartridgeEditModal();
 }
@@ -1549,7 +1612,7 @@ function renderCartridgeEditModal(){
 
       <div class="field" style="margin-top:16px">
         <span class="field-lbl">Название *</span>
-        <input class="input" value="${escapeHtml(s.name)}" oninput="setCartridgeEditField('name', this.value)" placeholder="Например, HP CF283A">
+        ${nameFieldTemplate('cartridge', s, cartridgeModelOptions(), 'Например, 728')}
       </div>
 
       <div class="field">
@@ -1600,7 +1663,7 @@ async function submitCartridgeEdit(){
   const s = cartridgeEditState;
   if(!s) return;
   const name = s.name.trim();
-  if(!name){ toast('Укажите название картриджа'); return; }
+  if(!name){ toast('Выберите картридж из списка или впишите свой'); return; }
   const barcode = s.barcode.trim();
   const isNew = s.isNew;
   // Made outside the mutator so a retried cloud save doesn't create two cartridges.
@@ -1959,7 +2022,8 @@ function openScanner(onResult){
     </div>
   </div>`;
   startCameraScan();
-  if(!window.matchMedia('(hover: none), (pointer: coarse)').matches) setTimeout(() => { const el = document.getElementById('scan-manual-input'); if(el) el.focus(); }, 50);
+  // Focus the field only on a computer (for a USB scanner): on a phone the keyboard would cover the camera.
+  if(!isTouchDevice()) setTimeout(() => { const el = document.getElementById('scan-manual-input'); if(el) el.focus(); }, 50);
 }
 function closeScanner(){
   stopCameraScan();
