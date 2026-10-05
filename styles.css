@@ -353,3 +353,8 @@ textarea.input{padding:12px 14px}
 .unit-hist-row .mono{color:var(--faint);flex-shrink:0;width:86px}
 .unit-hist-row .t-sub{display:block}
 .unit-hist-row > span:last-child{min-width:0}
+.refill-btns{display:flex;gap:8px;flex-wrap:wrap}
+.p-empty-btn{height:40px;padding:0 12px;font-size:14px;white-space:nowrap}
+@media (max-width:860px){.refill-btns{width:100%}.refill-btns .btn-primary,.refill-btns .btn-secondary{flex:1;justify-content:center}.refill-card > .btn-secondary{width:100%;justify-content:center}}
+.scan-photo{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;min-height:50px;cursor:pointer}
+.scan-photo svg{width:20px;height:20px}

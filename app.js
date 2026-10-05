@@ -2758,6 +2758,9 @@ function openScanner(onResult){
       </div>
       <div id="scanner-reader" style="margin-top:14px;border-radius:12px;overflow:hidden;background:#14162B;min-height:220px"></div>
       <div id="scan-status" style="margin-top:10px;font-size:12px;color:var(--muted)">Запрашиваю доступ к камере…</div>
+      <label class="btn-secondary scan-photo">${ICONS.barcode}Сфотографировать штрих-код<input type="file" accept="image/*" capture="environment" style="display:none" onchange="scanPhoto(this)"></label>
+      <div class="field-hint" style="margin-top:6px">Если камера долго не читает (часто на iPhone) — нажмите эту кнопку и сделайте чёткое фото штрих-кода крупно.</div>
+      <div id="scanner-file-reader" style="display:none"></div>
       <div class="field" style="margin-top:6px">
         <span class="field-lbl">Или введите код вручную</span>
         <div style="display:flex;gap:8px">
@@ -2796,14 +2799,22 @@ function startCameraScan(){
     return;
   }
   try{
-    const inst = new Html5Qrcode('scanner-reader');
+    const inst = new Html5Qrcode('scanner-reader', scannerConfig());
     html5QrCodeInstance = inst;
-    inst.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 240, height: 140 } },
-      (decodedText) => handleScanResult(decodedText),
-      () => {}
-    ).then(() => {
+    const onCode = decodedText => handleScanResult(decodedText);
+    // A wide, short box suits ordinary (1D) barcodes; a high camera resolution is
+    // what lets iPhones read them — their default stream is too small for thin bars.
+    const opts = {
+      fps: 15,
+      qrbox: (w, h) => ({width: Math.max(200, Math.floor(w * 0.9)), height: Math.max(120, Math.floor(h * 0.5))}),
+      videoConstraints: {facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080}},
+    };
+    inst.start({facingMode: 'environment'}, opts, onCode, () => {})
+      // Some cameras refuse the high resolution — fall back to the plain stream.
+      .catch(() => html5QrCodeInstance === inst
+        ? inst.start({facingMode: 'environment'}, {fps: 10, qrbox: opts.qrbox}, onCode, () => {})
+        : Promise.reject(new Error('closed')))
+      .then(() => {
         if(html5QrCodeInstance !== inst){
           // Modal was closed before the camera finished starting — shut this one down
           // so the stream doesn't keep the camera light on in the background.
@@ -2821,6 +2832,55 @@ function startCameraScan(){
     cameraRunning = false;
     setScanStatus('Не удалось запустить камеру — введите код вручную.');
   }
+}
+// Only the barcode kinds found on cartridges and stickers: fewer formats, faster and surer reads.
+// Android Chrome then uses its built-in barcode reader; iPhone falls back to the library's own.
+function scannerConfig(){
+  const F = typeof Html5QrcodeSupportedFormats !== 'undefined' ? Html5QrcodeSupportedFormats : null;
+  const formats = F ? ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128', 'CODE_39', 'CODE_93', 'ITF', 'CODABAR', 'QR_CODE', 'DATA_MATRIX']
+    .map(k => F[k]).filter(v => v !== undefined) : undefined;
+  return {verbose: false, formatsToSupport: formats, experimentalFeatures: {useBarCodeDetectorIfSupported: true}};
+}
+// Reads a barcode from a photo taken with the phone's own camera app (sharp and in focus,
+// which is what iPhones need). Tries a reduced copy first, then the full photo.
+async function scanPhoto(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  if(typeof Html5Qrcode === 'undefined'){ setScanStatus('Библиотека сканера не загрузилась — введите код вручную.'); return; }
+  setScanStatus('Читаю штрих-код с фото…');
+  stopCameraScan();
+  const reader = new Html5Qrcode('scanner-file-reader', scannerConfig());
+  const tries = [];
+  try{ tries.push(await shrinkImage(file, 1600)); }catch(e){}
+  tries.push(file);
+  for(const f of tries){
+    try{
+      const code = await reader.scanFile(f, false);
+      try{ reader.clear(); }catch(e){}
+      handleScanResult(code);
+      return;
+    }catch(e){}
+  }
+  try{ reader.clear(); }catch(e){}
+  setScanStatus('Не удалось прочитать штрих-код на фото. Снимите ближе и ровнее, чтобы штрих-код был чётким и занимал почти всю ширину кадра — или введите цифры вручную.');
+}
+function shrinkImage(file, maxSide){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k);
+      cv.height = Math.round(img.height * k);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      cv.toBlob(b => b ? resolve(new File([b], 'photo.jpg', {type: 'image/jpeg'})) : reject(new Error('no blob')), 'image/jpeg', 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
 }
 function stopCameraScan(){
   if(html5QrCodeInstance){
