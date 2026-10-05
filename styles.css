@@ -389,3 +389,5 @@ body.readonly .edit-only{display:none!important}
 .inv-line{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:8px 12px;border-radius:10px;background:var(--paper);margin-top:6px;font-size:14.5px}
 .inv-line .mono{font-weight:700;flex-shrink:0}
 .inv-line span:last-child{color:var(--muted);text-align:right;min-width:0}
+
+.err-box{white-space:pre-wrap;word-break:break-word;background:var(--crit-bg);color:var(--crit-fg);padding:12px 14px;border-radius:12px;font-size:13px;margin:0}

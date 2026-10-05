@@ -115,7 +115,20 @@ function normalizeState(parsed){
   // Data saved before warehouses existed: everything it holds sits on the main warehouse.
   if(!Array.isArray(s.warehouses) || !s.warehouses.length) s.warehouses = defaultWarehouses();
   const demo = defaultData();
+  // Records written by older versions may miss fields or hold numbers where text is
+  // expected; tidy them so no page trips over them.
+  s.cartridges = s.cartridges.filter(c => c && c.id);
+  s.printers = s.printers.filter(p => p && p.id);
+  s.printers.forEach(p => { p.name = String(p.name == null ? '' : p.name); });
+  s.activity = s.activity.filter(a => a && typeof a === 'object');
+  Object.keys(s.history).forEach(cid => {
+    const list = Array.isArray(s.history[cid]) ? s.history[cid] : [];
+    s.history[cid] = list.filter(h => h && typeof h === 'object' && typeof h.date === 'string' && h.date)
+      .map(h => Object.assign(h, {qty: Number(h.qty) || 0}));
+  });
   s.cartridges.forEach(c => {
+    c.name = String(c.name == null ? '' : c.name);
+    c.stock = Number(c.stock) || 0;
     if(c.barcode === undefined){
       const match = demo.cartridges.find(x => x.id === c.id);
       c.barcode = match ? match.barcode : '';
@@ -131,6 +144,8 @@ function normalizeState(parsed){
   // Individual cartridges tracked by their own barcode (see the «units» section).
   if(!Array.isArray(s.units)) s.units = [];
   s.units = s.units.filter(u => u && u.code && u.cid);
+  // (a literal list: this runs while the page loads, before UNIT_STATUS is defined)
+  s.units.forEach(u => { u.code = String(u.code); if(!['stock', 'installed', 'empty', 'refill', 'scrapped'].includes(u.status)) u.status = 'stock'; });
   delete s.lastIssueWh; // now a per-device preference, see getPref()
   return s;
 }
@@ -1676,6 +1691,20 @@ function renderLoginView(){
     </div>
   </div>`;
 }
+function renderErrorView(e){
+  const where = String((e && e.stack) || '').split('\n').slice(0, 4).map(s => s.replace(/https?:\/\/[^\s)]*\//g, '').trim()).join('\n');
+  return `
+  <div class="content" style="padding-top:32px">
+    <div class="card" style="padding:22px;max-width:640px">
+      <h1 style="font-size:22px;margin-bottom:8px">Страница не открылась</h1>
+      <p style="font-size:15px;color:var(--muted);margin:0 0 12px">Данные в порядке — ошибка в программе. Сделайте снимок экрана и отправьте разработчику. Другие разделы в меню слева можно открывать.</p>
+      <pre class="err-box">${escapeHtml((e && e.message) || String(e))}\n${escapeHtml(where)}</pre>
+      <button class="btn-secondary" style="margin-top:12px" onclick="location.reload()">Обновить страницу</button>
+    </div>
+  </div>`;
+}
+// Errors in buttons show up as a message instead of silently doing nothing.
+window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}</div></div>`;
 }
@@ -3362,14 +3391,21 @@ function render(opts){
   }
 
   let html;
-  if(view === 'inventory') html = renderInventoryView();
-  else if(view === 'detail') html = renderDetailView(param);
-  else if(view === 'warehouses') html = param ? renderWarehouseView(param) : renderWarehousesView();
-  else if(view === 'printers') html = renderPrintersView();
-  else if(view === 'suppliers') html = renderSuppliersView();
-  else if(view === 'history') html = renderHistoryView();
-  else if(view === 'settings') html = renderSettingsView();
-  else html = renderDashboardView();
+  try{
+    if(view === 'inventory') html = renderInventoryView();
+    else if(view === 'detail') html = renderDetailView(param);
+    else if(view === 'warehouses') html = param ? renderWarehouseView(param) : renderWarehousesView();
+    else if(view === 'printers') html = renderPrintersView();
+    else if(view === 'suppliers') html = renderSuppliersView();
+    else if(view === 'history') html = renderHistoryView();
+    else if(view === 'settings') html = renderSettingsView();
+    else html = renderDashboardView();
+  }catch(e){
+    // A page that cannot be drawn must say so — otherwise the previous screen
+    // (often «Загрузка…») just stays there forever.
+    console.error(e);
+    html = renderErrorView(e);
+  }
 
   document.getElementById('view').innerHTML = html;
   updateNavActive(view);
