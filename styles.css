@@ -316,3 +316,40 @@ textarea.input{padding:12px 14px}
   .q-btn{width:38px;height:38px;font-size:20px}
   .c-row .pill{display:none}
 }
+
+/* ---------- barcoded cartridges, empties and refill ---------- */
+.refill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.refill-card{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.refill-num{font-size:30px;font-weight:800;line-height:1}
+.refill-num small{font-size:14px;font-weight:600;color:var(--faint);margin-left:4px}
+.refill-title{font-size:14px;color:var(--faint);margin-top:4px}
+.unit-group{margin-top:12px}
+.unit-group-head{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
+.unit-row{display:flex;width:100%;align-items:baseline;gap:10px;padding:9px 12px;border-radius:10px;background:var(--paper);margin-bottom:6px;text-align:left;font-size:14px;color:var(--text);border:0;cursor:pointer}
+.unit-row:hover{background:var(--border-2)}
+.unit-row .mono{font-weight:700;flex-shrink:0}
+.unit-where{color:var(--faint);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-now{margin-top:12px;font-size:14px;color:var(--faint);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.p-now .tag{border:0;cursor:pointer}
+.code-chip{display:inline-flex;align-items:center;gap:4px;height:42px;padding:0 6px 0 12px;border-radius:12px;background:var(--ok-bg);color:var(--ok-fg);font-size:15px;font-weight:700}
+.code-chip button{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;background:none;color:inherit;cursor:pointer;border-radius:8px}
+.code-chip button svg{width:16px;height:16px}
+.scan-add{height:42px;padding:0 14px;display:inline-flex;align-items:center;gap:8px}
+.scan-add svg{width:20px;height:20px}
+.scan-info{margin-top:10px;padding:11px 14px;border-radius:12px;background:var(--order-bg);color:var(--order-fg);font-size:15px;font-weight:600}
+.scan-info.bad{background:var(--crit-bg);color:var(--crit-fg)}
+.link-btn{border:0;background:none;padding:0;color:inherit;font:inherit;text-decoration:underline;cursor:pointer;font-weight:800}
+.field-hint{margin-top:8px;font-size:13.5px;color:var(--faint);line-height:1.4}
+.qty-fixed{height:52px;display:flex;align-items:center;font-size:16px;color:var(--muted)}
+.qty-fixed b{font-size:24px;color:var(--text);margin-right:6px}
+.check-row{display:flex;gap:12px;align-items:flex-start;padding:11px 12px;border-radius:12px;background:var(--paper);margin-bottom:8px;font-size:15px;cursor:pointer;line-height:1.4}
+.check-row input{width:22px;height:22px;flex-shrink:0;margin-top:1px;accent-color:var(--dark)}
+.unit-status{margin:16px 0;padding:13px 15px;border-radius:12px;background:var(--paper);border-left:4px solid;display:flex;flex-direction:column;gap:4px;font-size:15px;color:var(--muted)}
+.unit-status b{font-size:17px}
+.unit-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.unit-actions .btn-primary,.unit-actions .btn-secondary{flex:1;min-width:160px;justify-content:center}
+.unit-hist{display:flex;flex-direction:column;gap:2px;max-height:260px;overflow:auto}
+.unit-hist-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border-2);font-size:14.5px}
+.unit-hist-row .mono{color:var(--faint);flex-shrink:0;width:86px}
+.unit-hist-row .t-sub{display:block}
+.unit-hist-row > span:last-child{min-width:0}
