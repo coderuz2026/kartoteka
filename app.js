@@ -796,15 +796,16 @@ function filterChipsTemplate(){
 function refillOverviewTemplate(){
   const empty = state.units.filter(u => u.status === 'empty');
   const away = state.units.filter(u => u.status === 'refill');
-  if(!empty.length && !away.length) return '';
+  // Always shown, so the refill buttons are easy to find even while nothing is empty yet.
   const card = (title, list, color, btn) => `
     <div class="card refill-card">
-      <div><div class="refill-num" style="color:${color}">${list.length}<small>шт.</small></div><div class="refill-title">${title}</div></div>
-      ${list.length ? btn : ''}
+      <div><div class="refill-num" style="color:${list.length ? color : 'var(--faint)'}">${list.length}<small>шт.</small></div><div class="refill-title">${title}</div></div>
+      ${btn}
     </div>`;
   return `
     <div class="section">
       <div class="section-head"><h2>Пустые и заправка</h2></div>
+      ${!empty.length && !away.length ? `<p class="field-hint" style="margin:0 0 12px">Пустой картридж появляется здесь, когда при расходе в принтер снимаете старый (галочка «вернуть как пустой»), или из карточки картриджа: кнопка «Скан» → штрих-код → «Снят пустой — на склад».</p>` : ''}
       <div class="refill-grid">
         ${card('Пустые — ждут заправки', empty, 'var(--crit-fg)', `<button class="btn-secondary" onclick="openRefill('send')">Отправить на заправку</button>`)}
         ${card('Сейчас на заправке', away, 'var(--low-fg)', `<button class="btn-secondary" onclick="openRefill('back')">Вернулись с заправки</button>`)}
