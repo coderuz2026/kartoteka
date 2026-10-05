@@ -472,8 +472,16 @@ const FILTERS = [
   {key:'all', label:'Все'},
   {key:'toner', label:'Тонер'},
   {key:'ink', label:'Чернила'},
+  {key:'low', label:'Заканчиваются'},
   {key:'empty', label:'Нет в наличии'},
 ];
+// The inventory filters and their counts share one rule.
+function matchesFilter(c, key){
+  if(key === 'empty') return c.stock === 0;
+  if(key === 'low') return statusOf(c) === 'low';
+  if(key !== 'all') return c.type === key;
+  return true;
+}
 
 /* ---------- helpers ---------- */
 function escapeHtml(s){
@@ -550,14 +558,18 @@ function daysAgoIso(n){
   const d = new Date(); d.setDate(d.getDate()-n);
   return d.toISOString().slice(0,10);
 }
-// Status is about the main warehouse only: either something is on the shelf or not.
+// Status is about the main warehouse only. One rule for every model instead of a
+// per-model minimum: two or fewer left means it is time to order.
+const LOW_STOCK = 2;
 function statusOf(c){
-  if(c.stock > 0) return 'ok';
+  if(c.stock > LOW_STOCK) return 'ok';
+  if(c.stock > 0) return 'low';
   return c.onOrder ? 'order' : 'critical';
 }
 function statusMeta(status){
   return {
     ok:{label:'В наличии', cls:'pill-ok', bar:'var(--ok-dot)'},
+    low:{label:'Заканчивается', cls:'pill-low', bar:'var(--low-dot)'},
     critical:{label:'Нет в наличии', cls:'pill-critical', bar:'var(--crit-dot)'},
     order:{label:'На заказе', cls:'pill-order', bar:'var(--order-dot)'},
   }[status];
@@ -712,9 +724,21 @@ function unitWhere(u){
   if(u.status === 'stock') return `на складе ${whName(u.wh)}${since}`;
   if(u.status === 'installed') return `установлен в ${printerLabel(u.printerId)}${since}${u.by ? ', установил ' + u.by : ''}`;
   if(u.status === 'empty') return `пустой, лежит на складе ${whName(u.wh)}${since}`;
-  if(u.status === 'refill') return `на заправке${u.firm ? ' в ' + u.firm : ''}${since}`;
+  if(u.status === 'refill') return `на заправке${u.firm ? ' в ' + u.firm : ''}${since}${u.since ? ` (${daysSince(u.since)} дн.)` : ''}`;
   return `списан${since}`;
 }
+// Refill firm keeping a cartridge longer than this gets highlighted.
+const REFILL_LONG_DAYS = 14;
+// After this many refills a cartridge usually prints badly — suggest writing it off.
+const REFILL_MAX = 4;
+function daysSince(iso){ return iso ? Math.max(0, Math.round((Date.parse(todayIso()) - Date.parse(iso)) / 86400000)) : 0; }
+function refillTooLong(u){ return u.status === 'refill' && daysSince(u.since) > REFILL_LONG_DAYS; }
+// How many times this cartridge was handed to the refill firm.
+function refillCount(u){
+  const c = state.cartridges.find(x => x.id === u.cid);
+  return c ? getHistory(c).filter(h => h.type === 'refill' && entryHasCode(h, u.code)).length : 0;
+}
+function refillCountLabel(n){ return n ? `заправок: ${n}${n >= REFILL_MAX ? ' — пора списать?' : ''}` : 'ещё не заправлялся'; }
 
 function getHistory(c){
   return state.history[c.id] || [];
@@ -844,10 +868,7 @@ function warehouseCardsTemplate(){
 
 function filterChipsTemplate(){
   return FILTERS.map(f => {
-    let count;
-    if(f.key==='all') count = state.cartridges.length;
-    else if(f.key==='empty') count = state.cartridges.filter(c=>c.stock===0).length;
-    else count = state.cartridges.filter(c=>c.type===f.key).length;
+    const count = state.cartridges.filter(c => matchesFilter(c, f.key)).length;
     return `<button class="filter-chip ${f.key===activeFilter?'active':''}" onclick="setFilter('${f.key}')">${f.label} · ${count}</button>`;
   }).join('');
 }
@@ -859,9 +880,10 @@ function refillOverviewTemplate(){
   const inPrinters = state.units.filter(u => u.status === 'installed');
   // Always shown, so the refill buttons are easy to find even while nothing is empty yet.
   // viewOk: the button only shows information, so management sees it too.
-  const card = (title, list, color, btn, viewOk) => `
+  const tooLong = away.filter(refillTooLong).length;
+  const card = (title, list, color, btn, viewOk, warn) => `
     <div class="card refill-card">
-      <div><div class="refill-num" style="color:${list.length ? color : 'var(--faint)'}">${list.length}<small>шт.</small></div><div class="refill-title">${title}</div></div>
+      <div><div class="refill-num" style="color:${list.length ? color : 'var(--faint)'}">${list.length}<small>шт.</small></div><div class="refill-title">${title}</div>${warn ? `<div class="refill-warn">${warn}</div>` : ''}</div>
       <div class="${viewOk ? '' : 'edit-only'}">${btn}</div>
     </div>`;
   return `
@@ -871,7 +893,8 @@ function refillOverviewTemplate(){
       <div class="refill-grid">
         ${card('Стоят в принтерах', inPrinters, 'var(--order-fg)', `<button class="btn-secondary" onclick="openInstalledList()" ${inPrinters.length ? '' : 'disabled'}>Где стоят</button>`, true)}
         ${card('Пустые — ждут заправки', empty, 'var(--crit-fg)', `<div class="refill-btns"><button class="btn-primary" onclick="openEmptyReturn()">${ICONS.plus}Принять пустой</button><button class="btn-secondary" onclick="openRefill('send')">Отправить на заправку</button></div>`)}
-        ${card('Сейчас на заправке', away, 'var(--low-fg)', `<button class="btn-secondary" onclick="openRefill('back')">Вернулись с заправки</button>`)}
+        ${card('Сейчас на заправке', away, 'var(--low-fg)', `<button class="btn-secondary" onclick="openRefill('back')">Вернулись с заправки</button>`, false,
+          tooLong ? `⚠ ${tooLong} шт. у фирмы дольше ${REFILL_LONG_DAYS} дней` : '')}
       </div>
     </div>`;
 }
@@ -917,8 +940,10 @@ function renderDashboardView(){
   const {inQty, outQty} = monthTotals();
   const hasBranches = branchList().length > 0;
   const need = state.cartridges.filter(c => c.stock === 0);
-  // Main-warehouse stock: the ones that ran out first, then the rest by name.
-  const mainStockList = [...state.cartridges].sort((a,b) => (a.stock > 0) - (b.stock > 0) || a.name.localeCompare(b.name));
+  const low = state.cartridges.filter(c => statusOf(c) === 'low');
+  // Main-warehouse stock: the ones that ran out first, then the ones running low, then the rest.
+  const rank = c => c.stock === 0 ? 0 : statusOf(c) === 'low' ? 1 : 2;
+  const mainStockList = [...state.cartridges].sort((a,b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 
   return `
   <div class="topbar">
@@ -954,7 +979,7 @@ function renderDashboardView(){
       </div>
     </div>` : `
     <div class="section">
-      <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${need.length ? ` · <span style="color:var(--crit-fg)">закончились: ${need.length}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
+      <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${need.length ? ` · <span style="color:var(--crit-fg)">закончились: ${need.length}</span>` : ''}${low.length ? ` · <span style="color:var(--low-fg)">заканчиваются: ${low.length}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
       <div class="row-list">${mainStockList.slice(0, 8).map(rowTemplate).join('')}</div>
       ${mainStockList.length > 8 ? `<div style="margin-top:10px"><a href="#/inventory">Ещё ${mainStockList.length - 8} →</a></div>` : ''}
     </div>`}
@@ -1152,7 +1177,7 @@ function unitsCardTemplate(c){
       ${groups.length ? groups.map(g => `
         <div class="unit-group">
           <div class="unit-group-head" style="color:${UNIT_STATUS[g.status].color}">${UNIT_STATUS[g.status].label} · ${g.list.length}</div>
-          ${g.list.map(u => `<button class="unit-row" onclick="openUnitCard(${jsArg(u.code)})"><span class="mono">${escapeHtml(u.code)}</span><span class="unit-where">${escapeHtml(where(u))}${u.since ? ' · с ' + fmtDate(u.since) : ''}</span></button>`).join('')}
+          ${g.list.map(u => `<button class="unit-row" onclick="openUnitCard(${jsArg(u.code)})"><span class="mono">${escapeHtml(u.code)}</span><span class="unit-where">${escapeHtml(where(u))}${u.since ? ' · с ' + fmtDate(u.since) : ''}${refillCount(u) ? ' · заправок: ' + refillCount(u) : ''}</span></button>`).join('')}
         </div>`).join('')
         : `<p style="font-size:14px;color:var(--faint);margin:8px 0 0">Пока нет. При приходе отсканируйте штрих-код каждого картриджа — тогда видно, где каждый из них и когда его ставили.</p>`}
       ${legacy ? `<div class="warn-box edit-only" style="margin-top:12px;display:block"><span>Штрих-код <b class="mono">${escapeHtml(c.barcode)}</b> записан на всю модель. Если это код одного конкретного картриджа — </span><button class="btn-secondary" style="margin-top:8px" onclick="convertModelBarcode('${c.id}')">Сделать его кодом картриджа</button></div>` : ''}
@@ -1416,7 +1441,10 @@ function renderWarehousesView(){
   return `
   <div class="topbar">
     <div><h1>Склады</h1><p class="sub">${escapeHtml(whName(MAIN_WH))} — основной склад, остальные — филиалы</p></div>
+    <div class="topbar-actions">
+    <button class="btn-secondary" onclick="openInventory()">${ICONS.barcode}Инвентаризация</button>
     <button class="btn-secondary edit-only" onclick="addBranch()">${ICONS.plus}Добавить филиал</button>
+    </div>
   </div>
   <div class="content">
     <div class="section">${warehouseCardsTemplate()}</div>
@@ -1481,6 +1509,7 @@ function renderWarehouseView(id){
         <button class="btn-primary btn-out" onclick="openMovement(null,'issue',{wh:'${w.id}'})">${ICONS.minus}Расход</button>
       </div>
     </div>
+    <div style="margin:-4px 0 14px"><button class="btn-secondary" onclick="openInventory('${w.id}')">${ICONS.barcode}Инвентаризация этого склада</button></div>
     <div class="row-list">${list.length ? list.map(c => whRowTemplate(c, w.id)).join('') : `<div class="empty-state">Картриджей пока нет</div>`}</div>
   </div>`;
 }
@@ -1540,6 +1569,7 @@ function renderSettingsView(){
     <div style="display:flex;flex-direction:column;gap:14px;max-width:520px">
       <div class="row-list mob-only">
         <a class="menu-link" href="#/warehouses">${ICONS.store}Склады и филиалы</a>
+        <a class="menu-link" href="javascript:void(0)" onclick="openInventory()">${ICONS.barcode}Инвентаризация</a>
         <a class="menu-link" href="#/printers">${ICONS.printer}Принтеры</a>
         <a class="menu-link" href="#/suppliers">${ICONS.truck}Поставщики</a>
       </div>
@@ -1652,11 +1682,7 @@ function renderMessageView(title, text){
 
 /* ---------- inventory list update (partial re-render, keeps input focus) ---------- */
 function updateInventoryList(){
-  let list = state.cartridges.filter(c => {
-    if(activeFilter==='empty') return c.stock===0;
-    if(activeFilter!=='all') return c.type===activeFilter;
-    return true;
-  });
+  let list = state.cartridges.filter(c => matchesFilter(c, activeFilter));
   if(searchQuery.trim()){
     const q = searchQuery.trim().toLowerCase();
     list = list.filter(c => c.name.toLowerCase().includes(q) || (c.barcode || '').includes(q) || unitsOf(state, c.id).some(u => u.code.toLowerCase().includes(q)));
@@ -2485,11 +2511,11 @@ function downloadReport(){
 
   // Every barcoded cartridge and where it is now.
   const unitRows = [
-    ['Штрих-код', 'Картридж', 'Состояние', 'Где сейчас', 'С какого числа', 'Кто установил'],
+    ['Штрих-код', 'Картридж', 'Состояние', 'Где сейчас', 'С какого числа', 'Кто установил', 'Заправок'],
     ...state.units.map(u => {
       const c = state.cartridges.find(x => x.id === u.cid);
       const where = u.status === 'installed' ? printerLabel(u.printerId) : u.status === 'refill' ? (u.firm || '') : u.status === 'scrapped' ? '' : whName(u.wh);
-      return [u.code, c ? c.name : '', UNIT_STATUS[u.status] ? UNIT_STATUS[u.status].label : u.status, where, u.since ? fmtDate(u.since) : '', u.status === 'installed' ? u.by || '' : ''];
+      return [u.code, c ? c.name : '', UNIT_STATUS[u.status] ? UNIT_STATUS[u.status].label : u.status, where, u.since ? fmtDate(u.since) : '', u.status === 'installed' ? u.by || '' : '', refillCount(u)];
     }),
   ];
 
@@ -2547,7 +2573,7 @@ function downloadReport(){
   addSheet(printerRows, 'Принтеры', [30, 16, 20, 18, 26, 20]);
   addSheet(printerItemRows, 'Принтеры и картриджи', [30, 16, 26, 11, 11, 16, 20]);
   addSheet(moveRows, 'Движения', [12, 26, 13, 24, 28, 9, 14, 20, 28, 30]);
-  if(state.units.length) addSheet(unitRows, 'Штрих-коды', [20, 22, 14, 36, 14, 22]);
+  if(state.units.length) addSheet(unitRows, 'Штрих-коды', [20, 22, 14, 36, 14, 22, 10]);
   addSheet(stockRows, 'Остатки', [26, 16, 11, 11, ...liveWhs.map(() => 12), 9, 16, 18]);
   XLSX.writeFile(wb, `Отчёт_картриджи_${s.from}_${s.to}.xlsx`);
 
@@ -2680,7 +2706,8 @@ function renderUnitCard(){
       </div>
       <div class="unit-status" style="border-color:${meta.color}">
         <b style="color:${meta.color}">${meta.label}</b>
-        <span>${escapeHtml(unitWhere(u))}</span>
+        <span>${escapeHtml(unitWhere(u))}${refillTooLong(u) ? ` — <b style="color:var(--crit-fg)">дольше ${REFILL_LONG_DAYS} дней, напомните фирме</b>` : ''}</span>
+        <span style="${refillCount(u) >= REFILL_MAX ? 'color:var(--crit-fg);font-weight:700' : ''}">${refillCountLabel(refillCount(u))}</span>
       </div>
       ${['installed', 'empty', 'refill'].includes(u.status) ? `<div class="edit-only">${dateFieldTemplate('unitCardState', s.date)}</div>` : ''}
       ${actions ? `<div class="edit-only">${actions}</div>` : ''}
@@ -2741,8 +2768,10 @@ function renderRefillModal(){
   s.picked = s.picked.filter(code => list.some(u => u.code === code));
   const rows = list.map(u => {
     const c = state.cartridges.find(x => x.id === u.cid);
-    return `<label class="check-row"><input type="checkbox" ${s.picked.includes(u.code) ? 'checked' : ''} onchange="toggleRefillPick(${jsArg(u.code)}, this.checked)">
-      <span><b>${escapeHtml(c ? c.name : '?')}</b> · <span class="mono">${escapeHtml(u.code)}</span><span class="t-sub">${escapeHtml(unitWhere(u))}</span></span></label>`;
+    const n = refillCount(u);
+    const late = refillTooLong(u);
+    return `<label class="check-row ${late ? 'row-late' : ''}"><input type="checkbox" ${s.picked.includes(u.code) ? 'checked' : ''} onchange="toggleRefillPick(${jsArg(u.code)}, this.checked)">
+      <span><b>${escapeHtml(c ? c.name : '?')}</b> · <span class="mono">${escapeHtml(u.code)}</span><span class="t-sub">${escapeHtml(unitWhere(u))}${late ? ' — долго!' : ''}</span><span class="t-sub" style="${n >= REFILL_MAX ? 'color:var(--crit-fg);font-weight:700' : ''}">${refillCountLabel(n)}</span></span></label>`;
   }).join('');
   root.innerHTML = `
   <div class="modal-backdrop" onclick="if(event.target===this) closeRefill()">
@@ -2923,6 +2952,140 @@ async function submitEmptyReturn(){
   render({keepScroll: true});
 }
 
+/* ---------- inventory check (сверка полки со сканером) ---------- */
+// Scan everything lying on one warehouse's shelf; the app compares it with what the
+// base says is there. Nothing in the base changes — it only shows the differences.
+let invState = null; // {wh, found: [codes], last, lastAt}
+let invCam = null;   // {inst, running}
+function openInventory(wh){
+  modalState = printerModalState = cartridgeEditState = unitCardState = refillState = emptyState = null;
+  invState = {wh: activeWarehouses().some(w => w.id === wh) ? wh : MAIN_WH, found: [], last: '', lastAt: 0};
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) closeInventory()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div><h1>Инвентаризация</h1><p style="margin:4px 0 0;font-size:14px;color:var(--faint)">Сканируйте подряд все картриджи на полке — программа покажет, чего не хватает и что лишнее. В базе ничего не меняется.</p></div>
+        <button class="icon-btn" aria-label="Закрыть" onclick="closeInventory()">${ICONS.x}</button>
+      </div>
+      <div class="field" style="margin-top:14px"><span class="field-lbl">Какой склад проверяем</span><div class="wh-chips" id="inv-whs"></div></div>
+      <div id="inv-reader" class="inv-reader"></div>
+      <div id="scan-status" style="margin-top:8px;font-size:13px;color:var(--muted)">Запрашиваю доступ к камере…</div>
+      <div id="inv-flash" class="inv-flash" style="display:none"></div>
+      <label class="btn-secondary scan-photo">${ICONS.barcode}Сфотографировать штрих-код<input type="file" accept="image/*" capture="environment" style="display:none" onchange="scanPhoto(this, addInventoryCode)"></label>
+      <div id="scanner-file-reader" style="display:none"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input class="input" id="inv-manual" placeholder="Или введите код / USB-сканер" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter'){event.preventDefault();addInventoryCode(this.value);this.value='';}">
+        <button class="btn-secondary" onclick="const el=document.getElementById('inv-manual');addInventoryCode(el.value);el.value='';">OK</button>
+      </div>
+      <div id="inv-results" style="margin-top:16px"></div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="restartInventory()">Начать заново</button>
+        <button class="btn-primary" onclick="closeInventory()">${ICONS.check}Готово</button>
+      </div>
+    </div>
+  </div>`;
+  updateInventoryView();
+  startInventoryCamera();
+}
+function closeInventory(){
+  stopInventoryCamera();
+  invState = null;
+  document.getElementById('modal-root').innerHTML = '';
+}
+function restartInventory(){
+  if(!invState) return;
+  if(invState.found.length && !confirm('Сбросить отсканированное и начать заново?')) return;
+  invState.found = [];
+  updateInventoryView();
+}
+function setInventoryWh(id){
+  if(!invState || invState.wh === id) return;
+  if(invState.found.length && !confirm('Проверить другой склад? Отсканированное сбросится.')) return;
+  invState.wh = id;
+  invState.found = [];
+  updateInventoryView();
+}
+function addInventoryCode(raw){
+  const s = invState;
+  if(!s) return;
+  const code = String(raw || '').trim();
+  if(!code) return;
+  const now = Date.now();
+  // The camera reports the same barcode many times a second while it stays in view.
+  if(code === s.last && now - s.lastAt < 3000) return;
+  s.last = code; s.lastAt = now;
+  const flash = document.getElementById('inv-flash');
+  const show = (text, bad) => { if(flash){ flash.style.display = ''; flash.className = 'inv-flash' + (bad ? ' bad' : ''); flash.textContent = text; } };
+  if(s.found.includes(code)){ show(`${code} — уже отсканирован`); return; }
+  s.found.push(code);
+  const u = findUnit(state, code);
+  const c = u && state.cartridges.find(x => x.id === u.cid);
+  const here = u && (u.status === 'stock' || u.status === 'empty') && u.wh === s.wh;
+  if(here) show(`✓ ${code} — ${c ? c.name : ''}${u.status === 'empty' ? ' (пустой)' : ''}`);
+  else show(`⚠ ${code} — ${u ? `по базе ${unitWhere(u)}` : 'нет в базе'}`, true);
+  if(navigator.vibrate) try{ navigator.vibrate(here ? 60 : [60, 60, 60]); }catch(e){}
+  updateInventoryView();
+}
+function updateInventoryView(){
+  const s = invState;
+  if(!s) return;
+  const whs = document.getElementById('inv-whs');
+  if(whs) whs.innerHTML = activeWarehouses().map(w => `<button class="filter-chip ${s.wh===w.id?'active':''}" onclick="setInventoryWh('${w.id}')">${escapeHtml(w.name)}</button>`).join('');
+  const box = document.getElementById('inv-results');
+  if(!box) return;
+  const nameOf = u => { const c = state.cartridges.find(x => x.id === u.cid); return c ? c.name : '?'; };
+  // Expected on this shelf: full cartridges and the empty ones waiting for a refill.
+  const expected = state.units.filter(u => (u.status === 'stock' || u.status === 'empty') && u.wh === s.wh);
+  const found = new Set(s.found);
+  const ok = expected.filter(u => found.has(u.code));
+  const missing = expected.filter(u => !found.has(u.code));
+  const extra = s.found.filter(code => !expected.some(u => u.code === code));
+  const untracked = state.cartridges.map(c => ({c, n: untrackedStock(state, c, s.wh)})).filter(x => x.n > 0);
+  const unitLine = u => `<div class="inv-line"><span class="mono">${escapeHtml(u.code)}</span> <span>${escapeHtml(nameOf(u))}${u.status === 'empty' ? ' · пустой' : ''}</span></div>`;
+  box.innerHTML = `
+    <div class="inv-summary">
+      <div><b>${ok.length}</b><span>найдено из ${expected.length}</span></div>
+      <div class="${missing.length ? 'bad' : ''}"><b>${missing.length}</b><span>не найдено</span></div>
+      <div class="${extra.length ? 'warn' : ''}"><b>${extra.length}</b><span>лишние</span></div>
+    </div>
+    ${missing.length ? `<div class="inv-block"><div class="unit-group-head" style="color:var(--crit-fg)">Числятся на складе, но не отсканированы · ${missing.length}</div>${missing.map(unitLine).join('')}</div>` : ''}
+    ${extra.length ? `<div class="inv-block"><div class="unit-group-head" style="color:var(--low-fg)">Лежат здесь, но по базе их тут нет · ${extra.length}</div>${extra.map(code => {
+      const u = findUnit(state, code);
+      return `<div class="inv-line"><span class="mono">${escapeHtml(code)}</span> <span>${u ? `${escapeHtml(nameOf(u))} — по базе ${escapeHtml(unitWhere(u))}` : 'нет в базе — оформите приход'}</span></div>`;
+    }).join('')}</div>` : ''}
+    ${untracked.length ? `<div class="inv-block"><div class="unit-group-head">Без штрих-кода — пересчитайте руками</div>${untracked.map(x => `<div class="inv-line"><span>${escapeHtml(x.c.name)}</span> <b>${x.n} шт.</b></div>`).join('')}</div>` : ''}
+    ${!expected.length && !untracked.length && !extra.length ? `<div class="field-hint">По базе на этом складе ничего нет.</div>` : ''}`;
+}
+function startInventoryCamera(){
+  if(typeof Html5Qrcode === 'undefined'){ setScanStatus('Библиотека сканера не загрузилась — вводите код вручную.'); return; }
+  if(!window.isSecureContext){ setScanStatus('Камера доступна только по HTTPS — вводите код вручную.'); return; }
+  try{
+    const inst = new Html5Qrcode('inv-reader', scannerConfig());
+    invCam = {inst, running: false};
+    const onCode = code => addInventoryCode(code);
+    const opts = cameraOptions();
+    const current = () => invCam && invCam.inst === inst;
+    inst.start({facingMode: 'environment'}, opts, onCode, () => {})
+      .catch(() => current() ? inst.start({facingMode: 'environment'}, {fps: 10, qrbox: opts.qrbox}, onCode, () => {}) : Promise.reject(new Error('closed')))
+      .then(() => {
+        if(!current()){ inst.stop().then(() => inst.clear()).catch(() => {}); return; }
+        invCam.running = true;
+        setScanStatus('Наводите камеру на штрих-коды по очереди — каждый засчитается один раз.');
+      })
+      .catch(err => { if(current()) setScanStatus('Камера недоступна: ' + (err && err.message ? err.message : String(err)) + ' — вводите код вручную или фото.'); });
+  }catch(e){
+    setScanStatus('Не удалось запустить камеру — вводите код вручную.');
+  }
+}
+function stopInventoryCamera(){
+  if(!invCam) return;
+  const {inst, running} = invCam;
+  invCam = null;
+  if(running) inst.stop().then(() => inst.clear()).catch(() => {});
+  else { try{ inst.clear(); }catch(e){} }
+}
+
 /* ---------- barcode scanner ---------- */
 let html5QrCodeInstance = null;
 let cameraRunning = false;
@@ -3032,13 +3195,7 @@ function startCameraScan(){
     const inst = new Html5Qrcode('scanner-reader', scannerConfig());
     html5QrCodeInstance = inst;
     const onCode = decodedText => handleScanResult(decodedText);
-    // A wide, short box suits ordinary (1D) barcodes; a high camera resolution is
-    // what lets iPhones read them — their default stream is too small for thin bars.
-    const opts = {
-      fps: 15,
-      qrbox: (w, h) => ({width: Math.max(200, Math.floor(w * 0.9)), height: Math.max(120, Math.floor(h * 0.5))}),
-      videoConstraints: {facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080}},
-    };
+    const opts = cameraOptions();
     inst.start({facingMode: 'environment'}, opts, onCode, () => {})
       // Some cameras refuse the high resolution — fall back to the plain stream.
       .catch(() => html5QrCodeInstance === inst
@@ -3063,6 +3220,15 @@ function startCameraScan(){
     setScanStatus('Не удалось запустить камеру — введите код вручную.');
   }
 }
+// A wide, short box suits ordinary (1D) barcodes; a high camera resolution is
+// what lets iPhones read them — their default stream is too small for thin bars.
+function cameraOptions(){
+  return {
+    fps: 15,
+    qrbox: (w, h) => ({width: Math.max(200, Math.floor(w * 0.9)), height: Math.max(120, Math.floor(h * 0.5))}),
+    videoConstraints: {facingMode: 'environment', width: {ideal: 1920}, height: {ideal: 1080}},
+  };
+}
 // Only the barcode kinds found on cartridges and stickers: fewer formats, faster and surer reads.
 // Android Chrome then uses its built-in barcode reader; iPhone falls back to the library's own.
 function scannerConfig(){
@@ -3073,13 +3239,15 @@ function scannerConfig(){
 }
 // Reads a barcode from a photo taken with the phone's own camera app (sharp and in focus,
 // which is what iPhones need). Tries a reduced copy first, then the full photo.
-async function scanPhoto(input){
+// onCode: where the code goes (the inventory check keeps its camera running); by default
+// the ordinary scanner window takes it and closes.
+async function scanPhoto(input, onCode){
   const file = input.files && input.files[0];
   input.value = '';
   if(!file) return;
   if(typeof Html5Qrcode === 'undefined'){ setScanStatus('Библиотека сканера не загрузилась — введите код вручную.'); return; }
   setScanStatus('Читаю штрих-код с фото…');
-  stopCameraScan();
+  if(!onCode) stopCameraScan();
   const reader = new Html5Qrcode('scanner-file-reader', scannerConfig());
   const tries = [];
   try{ tries.push(await shrinkImage(file, 1600)); }catch(e){}
@@ -3088,7 +3256,7 @@ async function scanPhoto(input){
     try{
       const code = await reader.scanFile(f, false);
       try{ reader.clear(); }catch(e){}
-      handleScanResult(code);
+      (onCode || handleScanResult)(code);
       return;
     }catch(e){}
   }

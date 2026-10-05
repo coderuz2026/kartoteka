@@ -372,3 +372,20 @@ body.readonly .edit-only{display:none!important}
 
 .del-entry{width:34px;height:34px;color:var(--crit-fg)}
 .del-entry svg{width:16px;height:16px}
+
+/* low stock, refill warnings, inventory check */
+.refill-warn{margin-top:6px;font-size:13.5px;font-weight:700;color:var(--crit-fg)}
+.check-row.row-late{background:var(--crit-bg)}
+.inv-reader{margin-top:14px;border-radius:12px;overflow:hidden;background:#14162B;min-height:200px}
+.inv-flash{margin-top:10px;padding:11px 14px;border-radius:12px;background:var(--ok-bg);color:var(--ok-fg);font-size:15px;font-weight:700;word-break:break-word}
+.inv-flash.bad{background:var(--low-bg);color:var(--low-fg)}
+.inv-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.inv-summary > div{background:var(--paper);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.inv-summary b{font-size:26px;line-height:1.1}
+.inv-summary span{font-size:13px;color:var(--faint)}
+.inv-summary .bad b{color:var(--crit-fg)}
+.inv-summary .warn b{color:var(--low-fg)}
+.inv-block{margin-top:14px}
+.inv-line{display:flex;gap:10px;align-items:baseline;justify-content:space-between;padding:8px 12px;border-radius:10px;background:var(--paper);margin-top:6px;font-size:14.5px}
+.inv-line .mono{font-weight:700;flex-shrink:0}
+.inv-line span:last-child{color:var(--muted);text-align:right;min-width:0}
