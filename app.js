@@ -1057,13 +1057,87 @@ function renderDetailView(id){
       <div class="card" style="padding:20px">
         <h2 style="margin-bottom:10px">История движений</h2>
         <table>
-          <thead><tr><th>Дата</th><th>Операция</th><th style="text-align:right">Кол-во</th><th style="text-align:right">Остаток</th></tr></thead>
-          <tbody>${hist.length ? hist.slice(0,8).map(h => `<tr><td>${fmtDate(h.date)}</td><td>${escapeHtml(opLabel(h))}${printerNameOf(h) ? `<div class="t-sub">${escapeHtml(printerNameOf(h))}</div>` : ''}</td><td class="mono" style="text-align:right;color:${opColor(h)}">${opSign(h)}${h.qty}</td><td class="mono" style="text-align:right">${h.result}</td></tr>`).join('') : `<tr><td colspan="4" class="empty-state">Операций пока нет</td></tr>`}</tbody>
+          <thead><tr><th>Дата</th><th>Операция</th><th style="text-align:right">Кол-во</th><th style="text-align:right">Остаток</th><th class="edit-only"></th></tr></thead>
+          <tbody>${hist.length ? hist.slice(0,30).map(h => `<tr><td>${fmtDate(h.date)}</td><td>${escapeHtml(opLabel(h))}${printerNameOf(h) ? `<div class="t-sub">${escapeHtml(printerNameOf(h))}</div>` : ''}${h.codes && h.codes.length ? `<div class="t-sub mono">${escapeHtml(h.codes.join(', '))}</div>` : `<div class="t-sub">без штрих-кода</div>`}</td><td class="mono" style="text-align:right;color:${opColor(h)}">${opSign(h)}${h.qty}</td><td class="mono" style="text-align:right">${h.result}</td><td class="edit-only" style="text-align:right">${canDeleteEntry(h)
+  ? `<button class="icon-btn del-entry" title="Удалить ошибочную запись" aria-label="Удалить запись" onclick="deleteHistoryEntry('${c.id}', ${jsArg(entryKey(h))})">${ICONS.trash}</button>`
+  : h.type === 'receive' && h.codes && h.codes.length === 1 && findUnit(state, h.codes[0])
+    ? `<button class="icon-btn del-entry" title="Удалить картридж, внесённый по ошибке" aria-label="Удалить картридж" onclick="deleteUnit(${jsArg(h.codes[0])})">${ICONS.trash}</button>`
+    : ''}</td></tr>`).join('') : `<tr><td colspan="5" class="empty-state">Операций пока нет</td></tr>`}</tbody>
         </table>
-        ${hist.length ? `<div style="margin-top:10px;font-size:12px;color:var(--faint)">Показаны последние ${Math.min(hist.length,8)} из ${hist.length}</div>` : ''}
+        ${hist.length ? `<div style="margin-top:10px;font-size:12px;color:var(--faint)">Показаны последние ${Math.min(hist.length,30)} из ${hist.length}<span class="edit-only"> · ошибочную запись можно удалить кнопкой ${ICONS.trash.replace('<svg', '<svg width="12" height="12"')} — остаток пересчитается</span></div>` : ''}
       </div>
     </div>
   </div>`;
+}
+
+// Fixing a mistake: a plain-count record (no barcodes) can be removed, which undoes its
+// effect on the stock. Barcoded records stay — their cartridges' state depends on them.
+function entryKey(h){
+  return JSON.stringify([h.date, h.type, h.qty, h.wh || '', h.from || '', h.to || '', h.who || '', h.dept || '', h.printerId || '', (h.codes || []).join(',')]);
+}
+function canDeleteEntry(h){ return ['receive', 'issue', 'transfer'].includes(h.type) && !(h.codes && h.codes.length); }
+async function deleteHistoryEntry(cid, key){
+  const c0 = state.cartridges.find(x => x.id === cid);
+  const h0 = c0 && getHistory(c0).find(h => entryKey(h) === key);
+  if(!h0) return;
+  if(!confirm(`Удалить ошибочную запись «${opLabel(h0)} ${opSign(h0)}${h0.qty}» от ${fmtDate(h0.date)}?\nОстаток «${c0.name}» пересчитается, как будто этой записи не было.`)) return;
+  const {ok} = await commit(st => {
+    const c = st.cartridges.find(x => x.id === cid);
+    const list = c && st.history[cid];
+    const i = list ? list.findIndex(h => entryKey(h) === key) : -1;
+    if(i < 0) throw userError('Эта запись уже изменена или удалена — обновите страницу');
+    const h = list[i];
+    if(!canDeleteEntry(h)) throw userError('Запись со штрих-кодами удалить нельзя');
+    const nameOf = id => { const w = st.warehouses.find(x => x.id === (id || MAIN_WH)); return w ? w.name : 'Склад удалён'; };
+    Object.entries(entryDeltas(h)).forEach(([wh, v]) => {
+      const next = whStock(c, wh) - v;
+      if(next < 0) throw userError(`Нельзя: на складе «${nameOf(wh)}» остаток станет меньше нуля`);
+      if(unitsOf(st, c.id, 'stock', wh).length > next) throw userError(`Нельзя: на складе «${nameOf(wh)}» эти картриджи со штрих-кодами`);
+      setWhStock(c, wh, next);
+    });
+    list.splice(i, 1);
+    recomputeResults(st, c);
+  });
+  if(!ok) return;
+  toast('Запись удалена, остаток пересчитан');
+  render({keepScroll: true});
+}
+
+// A barcoded cartridge entered by mistake: it disappears as if it never existed.
+// Its barcode is taken out of every record (a record left with nothing is removed),
+// so the stock drops by one only where the cartridge lies full right now.
+async function deleteUnit(code){
+  const u0 = findUnit(state, code);
+  if(!u0) return;
+  const c0 = state.cartridges.find(x => x.id === u0.cid);
+  if(!confirm(`Удалить картридж ${code}${c0 ? ' («' + c0.name + '»)' : ''} как внесённый по ошибке?\nОн исчезнет из остатков и из всей истории.`)) return;
+  const {ok, result} = await commit(st => {
+    const u = findUnit(st, code);
+    if(!u) throw userError('Этот картридж уже удалён');
+    const c = st.cartridges.find(x => x.id === u.cid);
+    if(c){
+      if(u.status === 'stock'){
+        const have = whStock(c, u.wh);
+        if(have < 1) throw userError('Остаток уже изменён на другом устройстве — обновите страницу');
+        setWhStock(c, u.wh, have - 1);
+      }
+      st.history[c.id] = (st.history[c.id] || []).filter(h => {
+        if(!entryHasCode(h, code)) return true;
+        h.codes = h.codes.filter(x => x !== code);
+        h.qty -= 1;
+        if(h.refillQty) h.refillQty = Math.min(h.refillQty, h.qty);
+        if(!h.codes.length) delete h.codes;
+        return h.qty > 0;
+      });
+      recomputeResults(st, c);
+    }
+    st.units = st.units.filter(x => x.code !== code);
+    return `Удалён: ${c ? c.name + ' · ' : ''}${code}`;
+  });
+  if(!ok) return;
+  if(unitCardState && unitCardState.code === code) closeUnitCard();
+  toast(result);
+  render({keepScroll: true});
 }
 
 // Every barcoded cartridge of this model, grouped by where it is now.
@@ -2046,7 +2120,8 @@ function openCartridgeCreate(barcode){
     name: '', barcode: barcode || '',
     type: 'toner', color: 'Чёрный',
     supplier: DEFAULT_SUPPLIER, location: DEFAULT_LOCATION,
-    initialStock: 1, custom: false,
+    // 0: creating just a name must not invent a cartridge; real ones come with their barcode.
+    initialStock: 0, custom: false,
     date: todayIso(),
   };
   renderCartridgeEditModal();
@@ -2135,8 +2210,9 @@ function renderCartridgeEditModal(){
 
       ${s.isNew ? `
       <div class="field" id="cart-qty-field" style="${s.barcode.trim() ? 'display:none' : ''}">
-        <span class="field-lbl">Сколько штук на складе ${escapeHtml(whName(MAIN_WH))} (без штрих-кода)</span>
+        <span class="field-lbl">Сколько штук БЕЗ штрих-кода уже лежит на складе ${escapeHtml(whName(MAIN_WH))}</span>
         <input class="input" type="number" min="0" inputmode="numeric" value="${s.initialStock}" oninput="setCartridgeEditField('initialStock', Math.max(0, Math.floor(Number(this.value)||0)))">
+        <div class="field-hint">Создаёте только название — оставьте 0. Картриджи со штрих-кодом добавляйте потом через «Приход» (сканируйте каждый).</div>
       </div>
       <div class="warn-box" id="cart-one-note" style="margin-bottom:14px;${s.barcode.trim() ? '' : 'display:none'}"><span>Добавится <b style="color:var(--text)">1 шт.</b> на склад ${escapeHtml(whName(MAIN_WH))} с этим штрих-кодом</span></div>
       ${dateFieldTemplate('cartridgeEditState', s.date, 'Дата прихода')}` : ''}
@@ -2617,6 +2693,7 @@ function renderUnitCard(){
           </div>`).join('') : `<div style="color:var(--faint);font-size:14px">Записей пока нет</div>`}
       </div>
       ${c ? `<div style="margin-top:14px"><a href="#/detail/${c.id}" onclick="closeUnitCard()">Все картриджи «${escapeHtml(c.name)}» →</a></div>` : ''}
+      <button class="btn-secondary edit-only" style="margin-top:14px;width:100%;justify-content:center;color:var(--crit-fg)" onclick="deleteUnit(${jsArg(u.code)})">${ICONS.trash} Удалить картридж (внесён по ошибке)</button>
     </div>
   </div>`;
 }

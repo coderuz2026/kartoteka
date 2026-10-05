@@ -369,3 +369,6 @@ body.readonly .edit-only{display:none!important}
 .installed-row .chip{width:10px;height:36px;border-radius:4px;flex-shrink:0}
 .installed-main{display:flex;flex-direction:column;min-width:0}
 .refill-card button[disabled]{opacity:.5;cursor:default}
+
+.del-entry{width:34px;height:34px;color:var(--crit-fg)}
+.del-entry svg{width:16px;height:16px}
