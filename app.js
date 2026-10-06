@@ -597,10 +597,21 @@ function daysAgoIso(n){
 // Status is about the main warehouse only. One rule for every model instead of a
 // per-model minimum: two or fewer left means it is time to order.
 const LOW_STOCK = 2;
+// Interchangeable models (different names, same printers) share c.group; for them the
+// warning looks at what the whole group has on the main shelf.
+function compatOf(c){ return c.group ? state.cartridges.filter(x => x.id !== c.id && x.group === c.group) : []; }
+function groupMainStock(c){ return c.stock + compatOf(c).reduce((s, x) => s + x.stock, 0); }
 function statusOf(c){
-  if(c.stock > LOW_STOCK) return 'ok';
-  if(c.stock > 0) return 'low';
+  const n = c.group ? groupMainStock(c) : c.stock;
+  if(n > LOW_STOCK) return 'ok';
+  if(n > 0) return 'low';
   return c.onOrder ? 'order' : 'critical';
+}
+// How many separate problems there are: an interchangeable group counts once.
+function countByStatus(statuses){
+  const seen = new Set();
+  state.cartridges.forEach(c => { if(statuses.includes(statusOf(c))) seen.add(c.group || c.id); });
+  return seen.size;
 }
 function statusMeta(status){
   return {
@@ -829,6 +840,7 @@ function rowTemplate(c){
       <div class="c-name">${escapeHtml(c.name)}${st === 'ok' ? '' : ` <span class="pill ${meta.cls}"><span class="pill-dot"></span>${meta.label}</span>`}</div>
       <div class="c-sub">${escapeHtml(cartridgeSub(c))}</div>
       ${inBranches.length ? `<div class="c-wh">В филиалах: ${escapeHtml(inBranches.join(' · '))}</div>` : ''}
+      ${compatOf(c).length ? `<div class="c-wh">Взаимозаменяемы с ${escapeHtml(compatOf(c).map(x => x.name).join(', '))} · вместе ${groupMainStock(c)} шт.</div>` : ''}
     </div>
     <div class="c-stock"><b style="color:${st==='ok' ? 'var(--text)' : meta.bar}">${c.stock}</b><span>шт.</span></div>
     <div class="c-quick edit-only">
@@ -935,6 +947,49 @@ function refillOverviewTemplate(){
     </div>`;
 }
 
+// This month's приходы or расходы behind the numbers on the dashboard, newest first.
+// Same rule as monthTotals(): every 'receive' / 'issue' record dated this month.
+function openMonthOps(type){
+  const prefix = todayIso().slice(0,7);
+  const rows = [];
+  state.cartridges.forEach(c => getHistory(c).forEach(h => { if(h.type === type && h.date.startsWith(prefix)) rows.push({h, c}); }));
+  rows.sort((a,b) => b.h.date.localeCompare(a.h.date));
+  const total = rows.reduce((s, r) => s + r.h.qty, 0);
+  const isIn = type === 'receive';
+  // Totals per model on top, so the main question («сколько каких?») is answered at once.
+  const byModel = {};
+  rows.forEach(({h, c}) => { byModel[c.id] = byModel[c.id] || {c, qty: 0}; byModel[c.id].qty += h.qty; });
+  const month = new Date().toLocaleDateString('ru-RU', {month:'long', year:'numeric'});
+  const line = ({h, c}) => {
+    const where = isIn
+      ? [h.refillQty ? 'с заправки' : '', h.who && h.who !== '—' ? h.who : '', h.wh && h.wh !== MAIN_WH ? whName(h.wh) : ''].filter(Boolean).join(' · ')
+      : [whName(h.wh), !printerNameOf(h) ? 'принтер не указан' : state.printers.some(p => p.id === h.printerId) ? printerLabel(h.printerId) : printerNameOf(h), h.who && h.who !== '—' ? h.who : ''].filter(Boolean).join(' · ');
+    return `
+      <a class="installed-row" href="#/detail/${c.id}" onclick="document.getElementById('modal-root').innerHTML=''">
+        <span class="chip" style="background:${colorHexOf(c)}"></span>
+        <span class="installed-main">
+          <b>${escapeHtml(c.name)} <span style="color:${isIn ? 'var(--ok-fg)' : 'var(--crit-fg)'}">${isIn ? '+' : '−'}${h.qty}</span></b>
+          <span class="t-sub">${fmtDate(h.date)}${where ? ' · ' + escapeHtml(where) : ''}${h.codes && h.codes.length ? ' · ' + escapeHtml(h.codes.join(', ')) : ''}</span>
+        </span>
+      </a>`;
+  };
+  document.getElementById('modal-root').innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this) this.remove()">
+    <div class="modal-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h1>${isIn ? 'Пришло' : 'Расход'} за ${escapeHtml(month)} · ${total} шт.</h1>
+        <button class="icon-btn" aria-label="Закрыть" onclick="document.getElementById('modal-root').innerHTML=''">${ICONS.x}</button>
+      </div>
+      ${rows.length ? `
+        <div class="wh-chips" style="margin:12px 0 4px">${Object.values(byModel).sort((a,b) => b.qty - a.qty).map(m => `<span class="tag">${escapeHtml(m.c.name)} · ${m.qty} шт.</span>`).join('')}</div>
+        <div class="unit-group-head" style="margin-top:14px">${isIn ? 'Все приходы' : 'Все расходы'} · ${rows.length}</div>
+        ${rows.map(line).join('')}
+        <p class="field-hint" style="margin-top:12px">Нажмите на строку — откроется картридж с полной историей.</p>`
+        : `<p style="color:var(--faint);margin-top:12px">В этом месяце ${isIn ? 'приходов' : 'расходов'} не было.</p>`}
+    </div>
+  </div>`;
+}
+
 // Every barcoded cartridge now standing in a printer, grouped by the branch the printer is in.
 function openInstalledList(){
   const units = state.units.filter(u => u.status === 'installed');
@@ -975,10 +1030,10 @@ function renderDashboardView(){
   const totalUnits = state.cartridges.reduce((s,c) => s + totalStock(c), 0);
   const {inQty, outQty} = monthTotals();
   const hasBranches = branchList().length > 0;
-  const need = state.cartridges.filter(c => c.stock === 0);
-  const low = state.cartridges.filter(c => statusOf(c) === 'low');
+  const needCount = countByStatus(['critical', 'order']);
+  const lowCount = countByStatus(['low']);
   // Main-warehouse stock: the ones that ran out first, then the ones running low, then the rest.
-  const rank = c => c.stock === 0 ? 0 : statusOf(c) === 'low' ? 1 : 2;
+  const rank = c => ({critical: 0, order: 0, low: 1})[statusOf(c)] ?? 2;
   const mainStockList = [...state.cartridges].sort((a,b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 
   return `
@@ -996,9 +1051,9 @@ function renderDashboardView(){
     </div>
 
     <div class="stat-row">
-      <div class="stat"><div class="stat-label">На всех складах</div><div class="stat-value">${totalUnits}<small>шт.</small></div></div>
-      <div class="stat"><div class="stat-label">Пришло за месяц</div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div></div>
-      <div class="stat"><div class="stat-label">Расход за месяц</div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div></div>
+      <a class="stat stat-link" href="#/warehouses"><div class="stat-label">На всех складах <span class="stat-more">подробнее →</span></div><div class="stat-value">${totalUnits}<small>шт.</small></div></a>
+      <button class="stat stat-link" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div></button>
+      <button class="stat stat-link" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div></button>
     </div>
 
     <div class="section">
@@ -1015,7 +1070,7 @@ function renderDashboardView(){
       </div>
     </div>` : `
     <div class="section">
-      <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${need.length ? ` · <span style="color:var(--crit-fg)">закончились: ${need.length}</span>` : ''}${low.length ? ` · <span style="color:var(--low-fg)">заканчиваются: ${low.length}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
+      <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${needCount ? ` · <span style="color:var(--crit-fg)">закончились: ${needCount}</span>` : ''}${lowCount ? ` · <span style="color:var(--low-fg)">заканчиваются: ${lowCount}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
       <div class="row-list">${mainStockList.slice(0, 8).map(rowTemplate).join('')}</div>
       ${mainStockList.length > 8 ? `<div style="margin-top:10px"><a href="#/inventory">Ещё ${mainStockList.length - 8} →</a></div>` : ''}
     </div>`}
@@ -1103,6 +1158,9 @@ function renderDetailView(id){
           ${c.barcode ? `<div><span class="field-label">Общий штрих-код модели</span><div class="field-value mono">${escapeHtml(c.barcode)}</div></div>` : ''}
           <div><span class="field-label">Поставщик</span><div class="field-value">${escapeHtml(c.supplier || '—')}</div></div>
           <div><span class="field-label">Место хранения</span><div class="field-value">${escapeHtml(c.location || '—')}</div></div>
+          <div style="grid-column:1/-1"><span class="field-label">Взаимозаменяемые</span><div class="field-value">${compatOf(c).length
+            ? `${compatOf(c).map(x => `<a href="#/detail/${x.id}">${escapeHtml(x.name)}</a>`).join(', ')} <span style="color:var(--faint);font-weight:500">· вместе на ${escapeHtml(whName(MAIN_WH))}: ${groupMainStock(c)} шт.</span>`
+            : '<span style="color:var(--faint);font-weight:500">нет — задайте кнопкой ✏️</span>'}</div></div>
         </div>
 
         <div class="card" style="padding:20px">
@@ -1728,7 +1786,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 30;
+const APP_VERSION = 32;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -2007,6 +2065,9 @@ function renderModal(){
           ? `Снятый из принтера картридж <b class="mono">${escapeHtml(old.map(u => u.code).join(', '))}</b> положить на склад «${escapeHtml(whName(modalState.wh))}» как пустой`
           : `Старый картридж, снятый из принтера, положить на склад «${escapeHtml(whName(modalState.wh))}» как пустой (для заправки)`}</span></label>`;
     summary = `${escapeHtml(whName(modalState.wh))}: ${have} → ${Math.max(0, have - qty)} шт.`;
+    // This model ran out here, but an interchangeable one may be on the same shelf.
+    const alt = have === 0 ? compatOf(c).filter(x => whStock(x, modalState.wh) > 0) : [];
+    if(alt.length) whFields = `<div class="scan-info">Этой модели здесь нет, но есть взаимозаменяемые: ${alt.map(x => `<button class="link-btn" onclick="setMovementCartridge('${x.id}')">${escapeHtml(x.name)} · ${whStock(x, modalState.wh)} шт.</button>`).join(', ')}</div>` + whFields;
   } else {
     const have = whStock(c, modalState.from);
     const moved = Math.min(qty, have);
@@ -2214,8 +2275,35 @@ function openCartridgeEdit(id){
     type: TYPE_LABELS[c.type] ? c.type : 'toner', color: normalizeColor(c.color),
     supplier: c.supplier || '', location: c.location || '',
     custom: isCustomName(c.name, cartridgeModelOptions()),
+    compat: compatOf(c).map(x => x.id),
   };
   renderCartridgeEditModal();
+}
+function toggleCompat(id){
+  const s = cartridgeEditState;
+  if(!s) return;
+  s.compat = s.compat.includes(id) ? s.compat.filter(x => x !== id) : s.compat.concat(id);
+  renderCartridgeEditModal();
+}
+// Interchangeability works like one shared list: ticking a model pulls in its whole
+// group, unticking takes just that model out. A group of one is no group.
+function applyCompat(st, c, wanted){
+  const old = c.group || '';
+  const gid = old || 'g-' + c.id;
+  if(old) st.cartridges.forEach(x => { if(x.id !== c.id && x.group === old && !wanted.includes(x.id)) x.group = ''; });
+  wanted.forEach(id => {
+    const x = st.cartridges.find(y => y.id === id);
+    if(!x) return;
+    if(x.group && x.group !== gid){ const og = x.group; st.cartridges.forEach(y => { if(y.group === og) y.group = gid; }); }
+    x.group = gid;
+  });
+  c.group = wanted.length ? gid : '';
+  cleanGroups(st);
+}
+function cleanGroups(st){
+  const size = {};
+  st.cartridges.forEach(x => { if(x.group) size[x.group] = (size[x.group] || 0) + 1; });
+  st.cartridges.forEach(x => { if(x.group && size[x.group] < 2) x.group = ''; });
 }
 function closeCartridgeEdit(){
   cartridgeEditState = null;
@@ -2287,6 +2375,13 @@ function renderCartridgeEditModal(){
         <div class="wh-chips">${Object.keys(COLORS).map(colorBtn).join('')}</div>
       </div>
 
+      ${!s.isNew && state.cartridges.length > 1 ? `
+      <div class="field">
+        <span class="field-lbl">Взаимозаменяемые — ставятся в те же принтеры</span>
+        <div class="wh-chips">${state.cartridges.filter(x => x.id !== s.id).map(x => `<button class="filter-chip ${s.compat.includes(x.id) ? 'active' : ''}" onclick="toggleCompat('${x.id}')">${escapeHtml(x.name)}</button>`).join('')}</div>
+        <div class="field-hint">Отметьте модели, которые можно поставить вместо этой. «Заканчивается» будет считаться по их общему остатку.</div>
+      </div>` : ''}
+
       ${s.isNew ? `
       <div class="field" id="cart-qty-field" style="${s.barcode.trim() ? 'display:none' : ''}">
         <span class="field-lbl">Сколько штук БЕЗ штрих-кода уже лежит на складе ${escapeHtml(whName(MAIN_WH))}</span>
@@ -2340,6 +2435,7 @@ async function submitCartridgeEdit(){
       const c = st.cartridges.find(x => x.id === s.id);
       if(!c) throw userError('Этот картридж удалён на другом устройстве');
       Object.assign(c, fields, {barcode});
+      applyCompat(st, c, (s.compat || []).filter(id => st.cartridges.some(x => x.id === id)));
       return `Сохранено: ${name}`;
     }
     // A new physical cartridge: its barcode belongs to it, not to the model.
@@ -2381,6 +2477,7 @@ async function deleteCartridge(id){
     st.cartridges = st.cartridges.filter(x => x.id !== id);
     st.units = st.units.filter(u => u.cid !== id);
     delete st.history[id];
+    cleanGroups(st);
   });
   if(!ok) return;
   cartridgeEditState = null;
