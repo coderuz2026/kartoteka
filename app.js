@@ -878,7 +878,16 @@ function monthQtyOf(c, type){
   const prefix = todayIso().slice(0,7);
   return getHistory(c).reduce((s, h) => s + (h.type === type && h.date.startsWith(prefix) ? h.qty : 0), 0);
 }
-function splitLine(t){ return `<div class="stat-split"><span>Тонер <b>${t.toner}</b></span><span>Чернила <b>${t.ink}</b></span></div>`; }
+// Two separate boxes — «Картриджи» (toner) and «Чернила». Styled inline so they look
+// right even if an older styles.css is still cached.
+function splitLine(t, sign){
+  const box = (label, n, color) => `
+    <div class="type-box" style="flex:1;min-width:0;background:var(--paper);border-radius:10px;padding:7px 10px;border-left:4px solid ${color};text-align:left">
+      <div style="font-size:12.5px;color:var(--faint);font-weight:600;white-space:nowrap">${label}</div>
+      <div style="font-size:21px;font-weight:800;line-height:1.2;color:var(--text)">${sign && n ? sign : ''}${n}<small style="font-size:12px;color:var(--faint);margin-left:3px;font-weight:600">шт.</small></div>
+    </div>`;
+  return `<div class="stat-split" style="display:flex;gap:8px;margin:8px 0 6px">${box('Картриджи', t.toner, '#23252B')}${box('Чернила', t.ink, '#1E9BB3')}</div>`;
+}
 function monthTotals(){
   const prefix = todayIso().slice(0,7);
   let inQty = 0, outQty = 0;
@@ -1065,8 +1074,8 @@ function renderDashboardView(){
 
     <div class="stat-row">
       <a class="stat stat-link" href="#/warehouses"><div class="stat-label">На всех складах <span class="stat-more">подробнее →</span></div><div class="stat-value">${totalUnits}<small>шт.</small></div>${splitLine(byType(totalStock))}</a>
-      <button class="stat stat-link" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${splitLine(byType(c => monthQtyOf(c, 'receive')))}</button>
-      <button class="stat stat-link" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${splitLine(byType(c => monthQtyOf(c, 'issue')))}</button>
+      <button class="stat stat-link" style="text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${splitLine(byType(c => monthQtyOf(c, 'receive')), '+')}</button>
+      <button class="stat stat-link" style="text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${splitLine(byType(c => monthQtyOf(c, 'issue')), '−')}</button>
     </div>
 
     <div class="section">
@@ -1088,7 +1097,7 @@ function renderDashboardView(){
         const list = mainStockList.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t);
         if(!list.length) return '';
         return `
-        <div class="type-head">${TYPE_LABELS[t]} · ${list.reduce((s, c) => s + c.stock, 0)} шт.</div>
+        <div class="type-head" style="font-size:14px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 8px">${t === 'ink' ? 'Чернила' : 'Картриджи (тонер)'} · ${list.reduce((s, c) => s + c.stock, 0)} шт.</div>
         <div class="row-list">${list.slice(0, 8).map(rowTemplate).join('')}</div>
         ${list.length > 8 ? `<div style="margin-top:8px"><a href="#/inventory" onclick="activeFilter='${t}'">Ещё ${list.length - 8} →</a></div>` : ''}`;
       }).join('')}
@@ -1805,7 +1814,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
