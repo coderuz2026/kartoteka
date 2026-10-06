@@ -878,17 +878,10 @@ function byType(qtyOf){
   state.cartridges.forEach(c => { r[c.type === 'ink' ? 'ink' : 'toner'] += qtyOf(c); });
   return r;
 }
-// This month's приход / расход quantities of one cartridge.
-function monthQtyOf(c, type){
-  const prefix = todayIso().slice(0,7);
-  return getHistory(c).reduce((s, h) => s + (h.type === type && h.date.startsWith(prefix) ? h.qty : 0), 0);
-}
 // Toner and ink side by side: a thin bar of their shares and a legend with the numbers.
 // Styled inline so they look right even if an older styles.css is still cached.
-// A stat card that is a <button>: look like the other cards, not like a browser button.
-const STAT_BTN = 'text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%';
-const TONER_COLOR = '#23252B';
-const INK_COLOR = '#1E9BB3';
+const TONER_COLOR = '#4a3aa7';
+const INK_COLOR = '#1baf7a';
 function typeLegend(t, sign){
   const item = (label, n, color) => `<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:9px;height:9px;border-radius:3px;background:${color}"></span>${label} <b style="color:var(--text)">${sign && n ? sign : ''}${n}</b></span>`;
   return `<div class="type-legend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13.5px;color:var(--faint)">${item('Картриджи', t.toner, TONER_COLOR)}${item('Чернила', t.ink, INK_COLOR)}</div>`;
@@ -983,8 +976,8 @@ function refillOverviewTemplate(){
 
 // This month's приходы or расходы behind the numbers on the dashboard, newest first.
 // Same rule as monthTotals(): every 'receive' / 'issue' record dated this month.
-function openMonthOps(type){
-  const prefix = todayIso().slice(0,7);
+function openMonthOps(type, monthKey){
+  const prefix = monthKey || todayIso().slice(0,7);
   const rows = [];
   state.cartridges.forEach(c => getHistory(c).forEach(h => { if(h.type === type && h.date.startsWith(prefix)) rows.push({h, c}); }));
   rows.sort((a,b) => b.h.date.localeCompare(a.h.date));
@@ -993,7 +986,7 @@ function openMonthOps(type){
   // Totals per model on top, so the main question («сколько каких?») is answered at once.
   const byModel = {};
   rows.forEach(({h, c}) => { byModel[c.id] = byModel[c.id] || {c, qty: 0}; byModel[c.id].qty += h.qty; });
-  const month = new Date().toLocaleDateString('ru-RU', {month:'long', year:'numeric'});
+  const month = monthName(prefix, 'long');
   const line = ({h, c}) => {
     const where = isIn
       ? [h.refillQty ? 'с заправки' : '', h.who && h.who !== '—' ? h.who : '', h.wh && h.wh !== MAIN_WH ? whName(h.wh) : ''].filter(Boolean).join(' · ')
@@ -1019,7 +1012,7 @@ function openMonthOps(type){
         <div class="unit-group-head" style="margin-top:14px">${isIn ? 'Все приходы' : 'Все расходы'} · ${rows.length}</div>
         ${rows.map(line).join('')}
         <p class="field-hint" style="margin-top:12px">Нажмите на строку — откроется картридж с полной историей.</p>`
-        : `<p style="color:var(--faint);margin-top:12px">В этом месяце ${isIn ? 'приходов' : 'расходов'} не было.</p>`}
+        : `<p style="color:var(--faint);margin-top:12px">За ${escapeHtml(month)} ${isIn ? 'приходов' : 'расходов'} не было.</p>`}
     </div>
   </div>`;
 }
@@ -1059,41 +1052,163 @@ function openInstalledList(){
   </div>`;
 }
 
-// One separate block per kind — «Картриджи» (toner) and «Чернила» — with its own total on
-// the main shelf, this month's in/out and its own list of models.
-function typeBlockTemplate(t, sortedList){
-  const list = sortedList.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t);
-  const isInk = t === 'ink';
-  const color = isInk ? INK_COLOR : TONER_COLOR;
-  const total = list.reduce((s, c) => s + c.stock, 0);
-  const inM = list.reduce((s, c) => s + monthQtyOf(c, 'receive'), 0);
-  const outM = list.reduce((s, c) => s + monthQtyOf(c, 'issue'), 0);
+/* ---------- dashboard infographics ---------- */
+// Colors by the job they do (checked with the dataviz palette validator, light surface):
+//   identity  — Картриджи violet, Чернила aqua (TONER_COLOR / INK_COLOR above);
+//   polarity  — приход blue above the baseline, расход red below it.
+// Text never takes a series color; every colored mark sits next to a text label.
+const FLOW_IN = '#2a78d6';
+const FLOW_OUT = '#e34948';
+
+// Year-month keys of the last n months, oldest first, e.g. ['2026-05', …, '2026-10'].
+function lastMonths(n){
+  const [y, m] = todayIso().split('-').map(Number);
+  const out = [];
+  for(let i = n - 1; i >= 0; i--){
+    const d = new Date(y, m - 1 - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+function monthName(key, style){
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(y, m - 1, 1);
+  return style === 'long' ? d.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}) : d.toLocaleDateString('ru-RU', {month:'short'}).replace('.', '');
+}
+function monthFlowSeries(keys){
+  const by = {};
+  keys.forEach(k => { by[k] = {in: 0, out: 0}; });
+  state.cartridges.forEach(c => getHistory(c).forEach(h => {
+    const b = by[h.date.slice(0, 7)];
+    if(!b) return;
+    if(h.type === 'receive') b.in += h.qty;
+    else if(h.type === 'issue') b.out += h.qty;
+  }));
+  return keys.map(k => Object.assign({k}, by[k]));
+}
+
+// Приход up, расход down from one baseline, one bar pair per month. Each half of a
+// month column is a tap target that opens that month's list.
+function flowChartSVG(series){
+  const W = 560, H = 230, y0 = 108, span = 78, slot = W / series.length;
+  const bw = Math.min(30, slot * 0.4);
+  const max = Math.max(1, ...series.map(s => Math.max(s.in, s.out)));
+  const cur = todayIso().slice(0, 7);
+  const r = 4;
+  const bar = (x, h, up) => {
+    if(h <= 0) return '';
+    const rr = Math.min(r, h);
+    return up
+      ? `M${x},${y0 - 1} V${y0 - 1 - h + rr} Q${x},${y0 - 1 - h} ${x + rr},${y0 - 1 - h} H${x + bw - rr} Q${x + bw},${y0 - 1 - h} ${x + bw},${y0 - 1 - h + rr} V${y0 - 1} Z`
+      : `M${x},${y0 + 1} V${y0 + 1 + h - rr} Q${x},${y0 + 1 + h} ${x + rr},${y0 + 1 + h} H${x + bw - rr} Q${x + bw},${y0 + 1 + h} ${x + bw},${y0 + 1 + h - rr} V${y0 + 1} Z`;
+  };
+  const cols = series.map((s, i) => {
+    const cx = slot * i + slot / 2, x = cx - bw / 2;
+    const hi = s.in / max * span, ho = s.out / max * span;
+    const name = monthName(s.k, 'long');
+    return `
+      <g>
+        <path d="${bar(x, hi, true)}" fill="${FLOW_IN}"/>
+        <path d="${bar(x, ho, false)}" fill="${FLOW_OUT}"/>
+        ${s.in ? `<text x="${cx}" y="${y0 - 8 - hi}" text-anchor="middle" class="v-val">+${s.in}</text>` : ''}
+        ${s.out ? `<text x="${cx}" y="${y0 + 18 + ho}" text-anchor="middle" class="v-val">−${s.out}</text>` : ''}
+        <text x="${cx}" y="${H - 6}" text-anchor="middle" class="v-axis${s.k === cur ? ' v-cur' : ''}">${monthName(s.k)}</text>
+        <rect x="${slot * i}" y="0" width="${slot}" height="${y0}" fill="transparent" class="v-hit" data-tip="${escapeHtml(name)}: пришло ${s.in} шт." onclick="openMonthOps('receive','${s.k}')"/>
+        <rect x="${slot * i}" y="${y0}" width="${slot}" height="${H - 24 - y0}" fill="transparent" class="v-hit" data-tip="${escapeHtml(name)}: расход ${s.out} шт." onclick="openMonthOps('issue','${s.k}')"/>
+      </g>`;
+  }).join('');
   return `
-    <div class="type-block">
-      <div class="type-block-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-radius:14px;background:var(--card);border:1px solid var(--border);border-left:6px solid ${color};margin-bottom:10px">
-        <div style="min-width:0">
-          <div style="font-size:18px;font-weight:800">${isInk ? 'Чернила' : 'Картриджи'}</div>
-          <div style="font-size:13px;color:var(--faint);margin-top:2px">${list.length} ${plural(list.length, 'модель', 'модели', 'моделей')} · за месяц <span style="color:var(--ok-fg);font-weight:700">+${inM}</span> / <span style="color:var(--crit-fg);font-weight:700">−${outM}</span></div>
-        </div>
-        <div style="font-size:30px;font-weight:800;white-space:nowrap">${total}<small style="font-size:14px;color:var(--faint);margin-left:4px">шт.</small></div>
-      </div>
-      ${list.length
-        ? `<div class="row-list">${list.slice(0, 8).map(rowTemplate).join('')}</div>
-           ${list.length > 8 ? `<div style="margin-top:8px"><a href="#/inventory" onclick="activeFilter='${t}'">Ещё ${list.length - 8} →</a></div>` : ''}`
-        : `<div class="row-list empty-state" style="padding:20px">${isInk ? 'Чернил пока нет. Добавьте: «Новый картридж» → тип «Чернила».' : 'Картриджей пока нет.'}</div>`}
-    </div>`;
+    <svg viewBox="0 0 ${W} ${H}" class="v-svg" role="img" aria-label="Приход и расход по месяцам">
+      <line x1="0" x2="${W}" y1="${y0}" y2="${y0}" class="v-base"/>
+      ${cols}
+    </svg>`;
+}
+
+// Composition ring: Картриджи vs Чернила, the total in the middle.
+function donutSVG(t){
+  const total = t.toner + t.ink;
+  const r = 52, c = 2 * Math.PI * r;
+  const parts = [{v: t.toner, color: TONER_COLOR, label: 'Картриджи'}, {v: t.ink, color: INK_COLOR, label: 'Чернила'}].filter(p => p.v > 0);
+  const gap = parts.length > 1 ? 3 : 0;
+  let off = 0;
+  const arcs = parts.map(p => {
+    const len = p.v / total * c;
+    const s = `<circle r="${r}" cx="70" cy="70" fill="none" stroke="${p.color}" stroke-width="18" stroke-dasharray="${Math.max(0.01, len - gap)} ${c}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)" data-tip="${p.label}: ${p.v} шт." class="v-hit"/>`;
+    off += len;
+    return s;
+  }).join('');
+  return `
+    <svg viewBox="0 0 140 140" class="v-donut" role="img" aria-label="Картриджи и чернила на складах">
+      ${total ? '' : `<circle r="${r}" cx="70" cy="70" fill="none" stroke="var(--border)" stroke-width="18"/>`}
+      ${arcs}
+      <text x="70" y="70" text-anchor="middle" class="v-donut-num">${total}</text>
+      <text x="70" y="90" text-anchor="middle" class="v-donut-sub">шт. всего</text>
+    </svg>`;
+}
+
+// One row per warehouse: a bar split by kind, all on one scale so the shelves compare.
+function warehouseBarsTemplate(){
+  const rows = activeWarehouses().map(w => ({w, t: byType(c => whStock(c, w.id))}));
+  const max = Math.max(1, ...rows.map(r => r.t.toner + r.t.ink));
+  return rows.map(({w, t}) => {
+    const total = t.toner + t.ink;
+    const seg = (v, color, label) => v ? `<span class="v-seg" style="width:${v / max * 100}%;background:${color}" data-tip="${escapeHtml(w.name)} · ${label}: ${v} шт."></span>` : '';
+    return `
+      <a class="v-row" href="#/warehouses/${w.id}">
+        <span class="v-row-name">${escapeHtml(w.name)}</span>
+        <span class="v-track">${total ? seg(t.toner, TONER_COLOR, 'картриджи') + seg(t.ink, INK_COLOR, 'чернила') : ''}</span>
+        <span class="v-row-val">${total ? `${total}<small> шт.</small>` : '<small>пусто</small>'}</span>
+      </a>`;
+  }).join('');
+}
+
+// Stock of each model on the main shelf; the dashed line marks «заканчивается» (≤ LOW_STOCK).
+function modelBarsTemplate(t){
+  const color = t === 'ink' ? INK_COLOR : TONER_COLOR;
+  const list = state.cartridges.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t).sort((a, b) => b.stock - a.stock || a.name.localeCompare(b.name));
+  if(!list.length) return `<div class="v-empty">${t === 'ink' ? 'Чернил пока нет. Добавьте: «Новый картридж» → тип «Чернила».' : 'Картриджей пока нет.'}</div>`;
+  const max = Math.max(LOW_STOCK + 1, ...list.map(c => c.stock));
+  const shown = list.slice(0, 8);
+  return shown.map(c => {
+    const st = statusOf(c);
+    const warn = st === 'ok' ? '' : st === 'low' ? `<span class="v-flag v-low">⚠ мало</span>` : `<span class="v-flag v-out">✕ нет</span>`;
+    const group = c.group ? ` · вместе с взаимозаменяемыми ${groupMainStock(c)} шт.` : '';
+    return `
+      <a class="v-row" href="#/detail/${c.id}" data-tip="${escapeHtml(c.name)}: ${c.stock} шт. на ${escapeHtml(whName(MAIN_WH))}${escapeHtml(group)}">
+        <span class="v-row-name">${escapeHtml(c.name)}</span>
+        <span class="v-track">${c.stock ? `<span class="v-seg" style="width:${c.stock / max * 100}%;background:${color}"></span>` : ''}<span class="v-limit" style="left:${LOW_STOCK / max * 100}%"></span></span>
+        <span class="v-row-val">${c.stock}${warn}</span>
+      </a>`;
+  }).join('') + (list.length > shown.length ? `<a class="v-more" href="#/inventory" onclick="activeFilter='${t}'">ещё ${list.length - shown.length} →</a>` : '');
+}
+
+// Printers that took the most cartridges — over all time, with this month beside it.
+function printerBarsTemplate(){
+  const month = todayIso().slice(0, 7);
+  const rows = state.printers.map(p => {
+    const ins = printerInstalls(p.id);
+    return {p, total: ins.reduce((s, x) => s + x.h.qty, 0), month: ins.filter(x => x.h.date.startsWith(month)).reduce((s, x) => s + x.h.qty, 0)};
+  }).filter(r => r.total > 0).sort((a, b) => b.total - a.total).slice(0, 6);
+  if(!rows.length) return `<div class="v-empty">Пока нет установок. При расходе выбирайте принтер — здесь появится, какой принтер «ест» больше всего.</div>`;
+  const max = Math.max(...rows.map(r => r.total));
+  return rows.map(({p, total, month: m}) => `
+    <a class="v-row v-row-wide" href="#/printers" data-tip="${escapeHtml(p.name)}${p.location ? ' — ' + escapeHtml(p.location) : ''}: всего ${total} шт., в этом месяце ${m}">
+      <span class="v-row-name">${escapeHtml(p.name)}<small>${escapeHtml(p.location || whName(p.wh))}</small></span>
+      <span class="v-track"><span class="v-seg" style="width:${total / max * 100}%;background:${FLOW_OUT}"></span></span>
+      <span class="v-row-val">${total}${m ? `<small> · +${m} в мес.</small>` : ''}</span>
+    </a>`).join('');
 }
 
 /* ---------- views ---------- */
 function renderDashboardView(){
-  const totalUnits = state.cartridges.reduce((s,c) => s + totalStock(c), 0);
+  const types = byType(totalStock);
+  const totalUnits = types.toner + types.ink;
   const {inQty, outQty} = monthTotals();
   const hasBranches = branchList().length > 0;
   const needCount = countByStatus(['critical', 'order']);
   const lowCount = countByStatus(['low']);
-  // Main-warehouse stock: the ones that ran out first, then the ones running low, then the rest.
-  const rank = c => ({critical: 0, order: 0, low: 1})[statusOf(c)] ?? 2;
-  const mainStockList = [...state.cartridges].sort((a,b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  const series = monthFlowSeries(lastMonths(6));
+  const legend = (items) => `<div class="v-legend">${items.map(([color, label]) => `<span><i style="background:${color}"></i>${label}</span>`).join('')}</div>`;
 
   return `
   <div class="topbar">
@@ -1109,43 +1224,146 @@ function renderDashboardView(){
       <button class="big-btn big-scan" onclick="openScanner(onBarcodeScanned)">${ICONS.barcode}<span>Сканировать<span class="desk-inline"> штрих-код</span></span></button>
     </div>
 
-    <div class="stat-row">
-      <button class="stat stat-link" style="${STAT_BTN}" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${typeLegend(byType(c => monthQtyOf(c, 'receive')), '+')}</button>
-      <button class="stat stat-link" style="${STAT_BTN}" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${typeLegend(byType(c => monthQtyOf(c, 'issue')), '−')}</button>
-      <button class="stat stat-link" style="${STAT_BTN}" onclick="activeFilter='need';location.hash='#/inventory'"><div class="stat-label">Нужно заказать <span class="stat-more">что именно →</span></div>
-        ${needCount + lowCount
-          ? `<div class="stat-value" style="color:${needCount ? 'var(--crit-fg)' : 'var(--low-fg)'}">${needCount + lowCount}</div><div class="type-legend" style="margin-top:8px;font-size:13.5px;color:var(--faint)">${[needCount ? `закончились: <b style="color:var(--crit-fg)">${needCount}</b>` : '', lowCount ? `заканчиваются: <b style="color:var(--low-fg)">${lowCount}</b>` : ''].filter(Boolean).join(' · ')}</div>`
-          : `<div class="stat-value" style="color:var(--ok-fg)">✓</div><div class="type-legend" style="margin-top:8px;font-size:13.5px;color:var(--faint)">всё в наличии</div>`}
-      </button>
-    </div>
-
-    <div class="section">
-      <div class="section-head"><h2>Склады <span style="font-weight:600;color:var(--faint);font-size:.8em">· всего ${totalUnits} шт.</span></h2><a href="#/warehouses">Остатки по складам →</a></div>
-      ${warehouseCardsTemplate()}
-    </div>
-
     ${!state.cartridges.length ? `
     <div class="section">
       <div class="row-list empty-state">
         <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>
-        Добавьте свои картриджи — после этого здесь появятся остатки и операции.
+        Добавьте свои картриджи — после этого здесь появятся остатки, графики и операции.
         <div style="margin-top:16px" class="edit-only"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div>
       </div>
     </div>` : `
-    <div class="section">
-      <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${needCount ? ` · <span style="color:var(--crit-fg)">закончились: ${needCount}</span>` : ''}${lowCount ? ` · <span style="color:var(--low-fg)">заканчиваются: ${lowCount}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
-      <div class="type-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;align-items:start">
-        ${typeBlockTemplate('toner', mainStockList)}${typeBlockTemplate('ink', mainStockList)}
-      </div>
+    <div class="v-grid">
+      <section class="card v-card">
+        <div class="v-head"><div><h2>Остатки</h2><p>на всех складах</p></div><a href="#/warehouses">по складам →</a></div>
+        <div class="v-stock">
+          ${donutSVG(types)}
+          <div class="v-stock-side">
+            ${legend([[TONER_COLOR, `Картриджи <b>${types.toner}</b>`], [INK_COLOR, `Чернила <b>${types.ink}</b>`]])}
+            <div class="v-rows">${warehouseBarsTemplate()}</div>
+          </div>
+        </div>
+        <button class="v-alert ${needCount ? 'v-alert-out' : lowCount ? 'v-alert-low' : 'v-alert-ok'}" onclick="activeFilter='need';location.hash='#/inventory'">
+          ${needCount + lowCount
+            ? `<b>${needCount ? '✕' : '⚠'} Нужно заказать: ${needCount + lowCount}</b><span>${[needCount ? `закончились ${needCount}` : '', lowCount ? `заканчиваются ${lowCount}` : ''].filter(Boolean).join(' · ')} — открыть список →</span>`
+            : `<b>✓ Всё в наличии</b><span>заказывать пока нечего</span>`}
+        </button>
+      </section>
+
+      <section class="card v-card">
+        <div class="v-head"><div><h2>Приход и расход</h2><p>за 6 месяцев · нажмите на месяц — откроется список</p></div></div>
+        <div class="v-kpis">
+          <button onclick="openMonthOps('receive')"><span>Пришло в этом месяце</span><b style="color:var(--ok-fg)">+${inQty}</b></button>
+          <button onclick="openMonthOps('issue')"><span>Расход в этом месяце</span><b style="color:var(--crit-fg)">−${outQty}</b></button>
+        </div>
+        ${flowChartSVG(series)}
+        ${legend([[FLOW_IN, 'Приход'], [FLOW_OUT, 'Расход']])}
+      </section>
+
+      <section class="card v-card">
+        <div class="v-head"><div><h2><i class="v-dot" style="background:${TONER_COLOR}"></i>Картриджи</h2><p>остаток на ${escapeHtml(whName(MAIN_WH))} · пунктир — «заканчивается»</p></div><a href="#/inventory" onclick="activeFilter='toner'">все →</a></div>
+        <div class="v-rows">${modelBarsTemplate('toner')}</div>
+      </section>
+
+      <section class="card v-card">
+        <div class="v-head"><div><h2><i class="v-dot" style="background:${INK_COLOR}"></i>Чернила</h2><p>остаток на ${escapeHtml(whName(MAIN_WH))} · пунктир — «заканчивается»</p></div><a href="#/inventory" onclick="activeFilter='ink'">все →</a></div>
+        <div class="v-rows">${modelBarsTemplate('ink')}</div>
+      </section>
+
+      <section class="card v-card">
+        <div class="v-head"><div><h2>Какие принтеры расходуют больше</h2><p>установлено картриджей, всего</p></div><a href="#/printers">принтеры →</a></div>
+        <div class="v-rows">${printerBarsTemplate()}</div>
+      </section>
+
+      <section class="card v-card">
+        <div class="v-head"><div><h2>Последние операции</h2><p>кто, что и когда</p></div><a href="#/history">вся история →</a></div>
+        <div class="v-activity">${state.activity.length ? state.activity.slice(0, 5).map(activityRowTemplate).join('') : `<div class="v-empty">Пока нет операций</div>`}</div>
+      </section>
     </div>`}
 
     ${refillOverviewTemplate()}
-
-    <div class="section">
-      <div class="section-head"><h2>Последние операции</h2><a href="#/history">Вся история →</a></div>
-      <div class="row-list">${state.activity.length ? state.activity.slice(0,6).map(activityRowTemplate).join('') : `<div class="empty-state">Пока нет операций</div>`}</div>
-    </div>
   </div>`;
+}
+
+// Chart styles live next to the chart code, so the dashboard looks right even when an
+// older styles.css is still cached in the browser.
+const VIZ_CSS = `
+.v-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:18px;margin-bottom:22px}
+.v-card{padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.v-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.v-head h2{font-size:18px;margin:0;display:flex;align-items:center;gap:8px}
+.v-head p{margin:2px 0 0;font-size:13px;color:var(--faint)}
+.v-head a{font-size:14px;font-weight:600;white-space:nowrap}
+.v-dot{display:inline-block;width:12px;height:12px;border-radius:4px}
+.v-stock{display:flex;gap:18px;align-items:center}
+.v-donut{width:150px;height:150px;flex-shrink:0}
+.v-donut-num{font-size:30px;font-weight:800;fill:var(--text)}
+.v-donut-sub{font-size:11px;fill:var(--faint)}
+.v-stock-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.v-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;color:var(--muted)}
+.v-legend span{display:inline-flex;align-items:center;gap:6px}
+.v-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.v-legend b{color:var(--text)}
+.v-rows{display:flex;flex-direction:column;gap:2px}
+.v-row{display:grid;grid-template-columns:minmax(70px,30%) 1fr auto;align-items:center;gap:10px;padding:6px 6px;border-radius:10px;color:var(--text);text-decoration:none;font-size:14px}
+.v-row:hover{background:var(--paper)}
+.v-row-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.v-row-name small{display:block;font-weight:500;color:var(--faint);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.v-track{position:relative;display:flex;gap:2px;height:12px;border-radius:99px;background:var(--paper);overflow:visible}
+.v-seg{height:100%;border-radius:99px;min-width:4px}
+.v-limit{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--low-dot);opacity:.7}
+.v-row-val{font-weight:800;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.v-row-val small{font-weight:600;color:var(--faint);font-size:12px}
+.v-flag{margin-left:8px;font-size:12px;font-weight:700;padding:2px 7px;border-radius:99px}
+.v-low{background:var(--low-bg);color:var(--low-fg)}
+.v-out{background:var(--crit-bg);color:var(--crit-fg)}
+.v-more{font-size:13.5px;font-weight:600;padding:6px}
+.v-empty{color:var(--faint);font-size:14px;padding:10px 4px}
+.v-alert{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font:inherit;width:100%;padding:11px 14px;border-radius:12px;border:0;cursor:pointer}
+.v-alert span{font-size:13px;opacity:.85}
+.v-alert-ok{background:var(--ok-bg);color:var(--ok-fg)}
+.v-alert-low{background:var(--low-bg);color:var(--low-fg)}
+.v-alert-out{background:var(--crit-bg);color:var(--crit-fg)}
+.v-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.v-kpis button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font:inherit;text-align:left;padding:10px 14px;border-radius:12px;border:0;background:var(--paper);cursor:pointer}
+.v-kpis span{font-size:13px;color:var(--faint)}
+.v-kpis b{font-size:26px;font-weight:800;line-height:1.1}
+.v-svg{width:100%;height:auto;display:block}
+.v-base{stroke:var(--border);stroke-width:1.5}
+.v-val{font-size:13px;font-weight:700;fill:var(--muted)}
+.v-axis{font-size:13px;fill:var(--faint)}
+.v-cur{fill:var(--text);font-weight:800}
+.v-hit{cursor:pointer}
+.v-activity .act-row{padding:10px 4px}
+#v-tip{position:fixed;z-index:9999;display:none;pointer-events:none;background:var(--dark);color:#fff;font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.18);max-width:280px}
+@media (max-width:560px){
+  .v-stock{flex-direction:column;align-items:stretch}.v-donut{align-self:center}.v-card{padding:14px}
+  .v-row{grid-template-columns:1fr auto;row-gap:5px}
+  .v-row-name{white-space:normal}
+  .v-track{grid-column:1 / -1;grid-row:2}
+}
+`;
+// One floating label for every chart mark that has data-tip (hover on a computer).
+function initChartTips(){
+  if(document.getElementById('v-tip')) return;
+  const style = document.createElement('style');
+  style.id = 'viz-css';
+  style.textContent = VIZ_CSS;
+  document.head.appendChild(style);
+  const tip = document.createElement('div');
+  tip.id = 'v-tip';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if(!el){ tip.style.display = 'none'; return; }
+    tip.textContent = el.getAttribute('data-tip');
+    tip.style.display = 'block';
+  });
+  document.addEventListener('mousemove', e => {
+    if(tip.style.display !== 'block') return;
+    const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = x + 'px';
+    tip.style.top = (e.clientY + 16) + 'px';
+  });
 }
 
 function renderInventoryView(){
@@ -1850,7 +2068,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -3630,4 +3848,4 @@ function render(opts){
 }
 
 window.addEventListener('hashchange', () => render());
-window.addEventListener('DOMContentLoaded', () => { initCloud(); render(); });
+window.addEventListener('DOMContentLoaded', () => { initChartTips(); initCloud(); render(); });
