@@ -508,13 +508,13 @@ const FILTERS = [
   {key:'all', label:'Все'},
   {key:'toner', label:'Тонер'},
   {key:'ink', label:'Чернила'},
-  {key:'low', label:'Заканчиваются'},
+  {key:'need', label:'Нужно заказать'},
   {key:'empty', label:'Нет в наличии'},
 ];
 // The inventory filters and their counts share one rule.
 function matchesFilter(c, key){
   if(key === 'empty') return c.stock === 0;
-  if(key === 'low') return statusOf(c) === 'low';
+  if(key === 'need') return statusOf(c) !== 'ok';
   if(key !== 'all') return c.type === key;
   return true;
 }
@@ -590,10 +590,6 @@ function fmtDate(iso){
   const [y,m,d] = iso.split('-');
   return `${d}.${m}.${y}`;
 }
-function daysAgoIso(n){
-  const d = new Date(); d.setDate(d.getDate()-n);
-  return d.toISOString().slice(0,10);
-}
 // Status is about the main warehouse only. One rule for every model instead of a
 // per-model minimum: two or fewer left means it is time to order.
 const LOW_STOCK = 2;
@@ -651,6 +647,15 @@ function whTotal(wh){ return state.cartridges.reduce((s,c) => s + whStock(c, wh)
 function defaultIssueWh(){
   const last = getPref('lastIssueWh');
   return last && activeWarehouses().some(w => w.id === last) ? last : MAIN_WH;
+}
+// Where a расход of this cartridge most likely comes from: the last used shelf if the
+// cartridge is there, otherwise the main warehouse, otherwise any shelf that has it.
+function issueWhFor(c, preferred){
+  const has = id => c && whStock(c, id) > 0;
+  if(has(preferred)) return preferred;
+  if(has(MAIN_WH)) return MAIN_WH;
+  const any = activeWarehouses().find(w => has(w.id));
+  return any ? any.id : preferred;
 }
 // How one history entry changes each warehouse's stock, as {warehouseId: signedQty}.
 // Stock counts only full cartridges: 'return' (an empty one taken out of a printer),
@@ -878,15 +883,20 @@ function monthQtyOf(c, type){
   const prefix = todayIso().slice(0,7);
   return getHistory(c).reduce((s, h) => s + (h.type === type && h.date.startsWith(prefix) ? h.qty : 0), 0);
 }
-// Two separate boxes — «Картриджи» (toner) and «Чернила». Styled inline so they look
-// right even if an older styles.css is still cached.
-function splitLine(t, sign){
-  const box = (label, n, color) => `
-    <div class="type-box" style="flex:1;min-width:0;background:var(--paper);border-radius:10px;padding:7px 10px;border-left:4px solid ${color};text-align:left">
-      <div style="font-size:12.5px;color:var(--faint);font-weight:600;white-space:nowrap">${label}</div>
-      <div style="font-size:21px;font-weight:800;line-height:1.2;color:var(--text)">${sign && n ? sign : ''}${n}<small style="font-size:12px;color:var(--faint);margin-left:3px;font-weight:600">шт.</small></div>
-    </div>`;
-  return `<div class="stat-split" style="display:flex;gap:8px;margin:8px 0 6px">${box('Картриджи', t.toner, '#23252B')}${box('Чернила', t.ink, '#1E9BB3')}</div>`;
+// Toner and ink side by side: a thin bar of their shares and a legend with the numbers.
+// Styled inline so they look right even if an older styles.css is still cached.
+// A stat card that is a <button>: look like the other cards, not like a browser button.
+const STAT_BTN = 'text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%';
+const TONER_COLOR = '#23252B';
+const INK_COLOR = '#1E9BB3';
+function typeLegend(t, sign){
+  const item = (label, n, color) => `<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:9px;height:9px;border-radius:3px;background:${color}"></span>${label} <b style="color:var(--text)">${sign && n ? sign : ''}${n}</b></span>`;
+  return `<div class="type-legend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13.5px;color:var(--faint)">${item('Картриджи', t.toner, TONER_COLOR)}${item('Чернила', t.ink, INK_COLOR)}</div>`;
+}
+function typeBar(t){
+  const total = t.toner + t.ink;
+  if(!total) return '';
+  return `<div class="type-bar" style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--paper);margin-top:12px"><span style="width:${t.toner / total * 100}%;background:${TONER_COLOR}"></span><span style="width:${t.ink / total * 100}%;background:${INK_COLOR}"></span></div>`;
 }
 function monthTotals(){
   const prefix = todayIso().slice(0,7);
@@ -925,13 +935,15 @@ function warehouseCardsTemplate(){
     if(f.got) parts.push(`<span style="color:var(--order-fg)">+${f.got} получено</span>`);
     if(f.sent) parts.push(`<span style="color:var(--order-fg)">→${f.sent} ${isMain ? 'в филиалы' : 'передано'}</span>`);
     if(f.out) parts.push(`<span style="color:var(--crit-fg)">−${f.out} расход</span>`);
+    const types = byType(c => whStock(c, w.id));
     return `
     <a class="wh-card ${isMain ? 'wh-main' : ''}" href="#/warehouses/${w.id}">
       <div class="wh-top"><span class="wh-name">${escapeHtml(w.name)}</span><span class="wh-tag">${isMain ? 'Основной' : 'Филиал'}</span></div>
-      <div class="wh-total">${total}<small>шт.</small></div>
-      ${splitLine(byType(c => whStock(c, w.id)))}
-      <div class="wh-sub">${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</div>
-      <div class="wh-month">${parts.length ? 'За месяц: ' + parts.join(' · ') : 'За месяц движений нет'}</div>
+      <div class="wh-total" style="${total ? '' : 'color:var(--faint)'}">${total}<small>шт.</small></div>
+      ${total
+        ? `${typeBar(types)}${typeLegend(types)}<div class="wh-sub" style="margin-top:6px">${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</div>`
+        : `<div class="wh-sub" style="margin-top:6px">${isMain ? 'Склад пуст — оформите приход' : `Пока пусто — передайте сюда с ${escapeHtml(whName(MAIN_WH))} кнопкой «В филиал»`}</div>`}
+      ${parts.length ? `<div class="wh-month">За месяц: ${parts.join(' · ')}</div>` : ''}
     </a>`;
   }).join('')}</div>`;
 }
@@ -1073,13 +1085,17 @@ function renderDashboardView(){
     </div>
 
     <div class="stat-row">
-      <a class="stat stat-link" href="#/warehouses"><div class="stat-label">На всех складах <span class="stat-more">подробнее →</span></div><div class="stat-value">${totalUnits}<small>шт.</small></div>${splitLine(byType(totalStock))}</a>
-      <button class="stat stat-link" style="text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${splitLine(byType(c => monthQtyOf(c, 'receive')), '+')}</button>
-      <button class="stat stat-link" style="text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${splitLine(byType(c => monthQtyOf(c, 'issue')), '−')}</button>
+      <button class="stat stat-link" style="${STAT_BTN}" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${typeLegend(byType(c => monthQtyOf(c, 'receive')), '+')}</button>
+      <button class="stat stat-link" style="${STAT_BTN}" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${typeLegend(byType(c => monthQtyOf(c, 'issue')), '−')}</button>
+      <button class="stat stat-link" style="${STAT_BTN}" onclick="activeFilter='need';location.hash='#/inventory'"><div class="stat-label">Нужно заказать <span class="stat-more">что именно →</span></div>
+        ${needCount + lowCount
+          ? `<div class="stat-value" style="color:${needCount ? 'var(--crit-fg)' : 'var(--low-fg)'}">${needCount + lowCount}</div><div class="type-legend" style="margin-top:8px;font-size:13.5px;color:var(--faint)">${[needCount ? `закончились: <b style="color:var(--crit-fg)">${needCount}</b>` : '', lowCount ? `заканчиваются: <b style="color:var(--low-fg)">${lowCount}</b>` : ''].filter(Boolean).join(' · ')}</div>`
+          : `<div class="stat-value" style="color:var(--ok-fg)">✓</div><div class="type-legend" style="margin-top:8px;font-size:13.5px;color:var(--faint)">всё в наличии</div>`}
+      </button>
     </div>
 
     <div class="section">
-      <div class="section-head"><h2>Склады</h2><a href="#/warehouses">Остатки по складам →</a></div>
+      <div class="section-head"><h2>Склады <span style="font-weight:600;color:var(--faint);font-size:.8em">· всего ${totalUnits} шт.</span></h2><a href="#/warehouses">Остатки по складам →</a></div>
       ${warehouseCardsTemplate()}
     </div>
 
@@ -1814,7 +1830,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -1868,7 +1884,7 @@ function openMovement(id, type, opts){
     qty: 1,
     party: defaultParty(t, c),
     note: '',
-    wh: opts.wh || defaultIssueWh(),
+    wh: opts.wh || issueWhFor(c, defaultIssueWh()),
     printerId: '',
     from, to,
     codes: [],        // barcodes of the individual cartridges in this operation
@@ -1902,6 +1918,8 @@ function setMovementModel(id){
   m.cartridgeId = id;
   const c = state.cartridges.find(x => x.id === id);
   if(m.type === 'receive') m.party = c ? c.supplier || '' : '';
+  // Another model may lie elsewhere — unless a printer or a scanned cartridge already fixed the shelf.
+  if(m.type === 'issue' && !m.printerId && !m.codes.length) m.wh = issueWhFor(c, m.wh);
   pruneMovementCodes();
 }
 // A scanned (or picked) barcode. Returns nothing; the caller re-renders.
@@ -2004,7 +2022,9 @@ function setMovementType(type){
   modalState.qty = 1;
   modalState.codes = [];
   modalState.info = null;
-  modalState.party = defaultParty(type, state.cartridges.find(x => x.id === modalState.cartridgeId));
+  const c = state.cartridges.find(x => x.id === modalState.cartridgeId);
+  modalState.party = defaultParty(type, c);
+  if(type === 'issue' && !modalState.printerId) modalState.wh = issueWhFor(c, modalState.wh);
   renderModal();
 }
 function setMovementWh(field, id){
