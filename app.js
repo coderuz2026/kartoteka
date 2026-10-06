@@ -405,6 +405,24 @@ async function submitLogin(){
     loginBusy = false;
   }
 }
+// Firebase e-mails a link for setting a new password to the address typed in the form.
+async function resetPassword(){
+  const email = ((document.getElementById('login-email') || {}).value || '').trim();
+  const msg = document.getElementById('login-msg');
+  if(!email){ if(msg) msg.textContent = 'Сначала впишите почту в поле выше'; return; }
+  try{
+    await firebase.auth().sendPasswordResetEmail(email);
+    if(msg){ msg.style.color = 'var(--ok-fg)'; msg.textContent = `Письмо со ссылкой отправлено на ${email}. Проверьте также папку «Спам».`; }
+  }catch(e){
+    if(msg){
+      msg.style.color = '';
+      msg.textContent = e.code === 'auth/invalid-email' ? 'Почта введена с ошибкой'
+        : e.code === 'auth/user-not-found' ? 'Такого аккаунта нет'
+        : e.code === 'auth/network-request-failed' ? 'Нет интернета'
+        : 'Не удалось отправить письмо: ' + (e.message || e.code);
+    }
+  }
+}
 function signOutCloud(){
   if(!confirm('Выйти из аккаунта на этом устройстве?')) return;
   firebase.auth().signOut();
@@ -1687,6 +1705,7 @@ function renderLoginView(){
         <div id="login-msg" style="min-height:22px;font-size:15px;color:var(--crit-fg);margin-bottom:8px"></div>
         <button class="btn-primary" type="submit" style="width:100%;min-height:56px;font-size:18px">Войти</button>
       </form>
+      <button class="link-btn" style="margin-top:14px;color:var(--order-fg);font-size:15px" onclick="resetPassword()">Забыли пароль?</button>
       <p style="margin:16px 0 0;font-size:13px;color:var(--faint)">Аккаунты создаются в консоли Firebase. После входа на этом устройстве повторно вводить пароль не нужно.</p>
     </div>
   </div>`;
