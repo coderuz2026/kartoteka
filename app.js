@@ -867,6 +867,18 @@ function activityRowTemplate(a){
   </div>`;
 }
 
+// Toner and ink counted apart: sum of qtyOf(c) per type → {toner, ink}.
+function byType(qtyOf){
+  const r = {toner: 0, ink: 0};
+  state.cartridges.forEach(c => { r[c.type === 'ink' ? 'ink' : 'toner'] += qtyOf(c); });
+  return r;
+}
+// This month's приход / расход quantities of one cartridge.
+function monthQtyOf(c, type){
+  const prefix = todayIso().slice(0,7);
+  return getHistory(c).reduce((s, h) => s + (h.type === type && h.date.startsWith(prefix) ? h.qty : 0), 0);
+}
+function splitLine(t){ return `<div class="stat-split"><span>Тонер <b>${t.toner}</b></span><span>Чернила <b>${t.ink}</b></span></div>`; }
 function monthTotals(){
   const prefix = todayIso().slice(0,7);
   let inQty = 0, outQty = 0;
@@ -908,6 +920,7 @@ function warehouseCardsTemplate(){
     <a class="wh-card ${isMain ? 'wh-main' : ''}" href="#/warehouses/${w.id}">
       <div class="wh-top"><span class="wh-name">${escapeHtml(w.name)}</span><span class="wh-tag">${isMain ? 'Основной' : 'Филиал'}</span></div>
       <div class="wh-total">${total}<small>шт.</small></div>
+      ${splitLine(byType(c => whStock(c, w.id)))}
       <div class="wh-sub">${models} ${plural(models, 'модель', 'модели', 'моделей')} в наличии</div>
       <div class="wh-month">${parts.length ? 'За месяц: ' + parts.join(' · ') : 'За месяц движений нет'}</div>
     </a>`;
@@ -1051,9 +1064,9 @@ function renderDashboardView(){
     </div>
 
     <div class="stat-row">
-      <a class="stat stat-link" href="#/warehouses"><div class="stat-label">На всех складах <span class="stat-more">подробнее →</span></div><div class="stat-value">${totalUnits}<small>шт.</small></div></a>
-      <button class="stat stat-link" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div></button>
-      <button class="stat stat-link" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div></button>
+      <a class="stat stat-link" href="#/warehouses"><div class="stat-label">На всех складах <span class="stat-more">подробнее →</span></div><div class="stat-value">${totalUnits}<small>шт.</small></div>${splitLine(byType(totalStock))}</a>
+      <button class="stat stat-link" onclick="openMonthOps('receive')"><div class="stat-label">Пришло за месяц <span class="stat-more">что пришло →</span></div><div class="stat-value" style="color:var(--ok-fg)">+${inQty}</div>${splitLine(byType(c => monthQtyOf(c, 'receive')))}</button>
+      <button class="stat stat-link" onclick="openMonthOps('issue')"><div class="stat-label">Расход за месяц <span class="stat-more">куда ушло →</span></div><div class="stat-value" style="color:var(--crit-fg)">−${outQty}</div>${splitLine(byType(c => monthQtyOf(c, 'issue')))}</button>
     </div>
 
     <div class="section">
@@ -1071,8 +1084,14 @@ function renderDashboardView(){
     </div>` : `
     <div class="section">
       <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${needCount ? ` · <span style="color:var(--crit-fg)">закончились: ${needCount}</span>` : ''}${lowCount ? ` · <span style="color:var(--low-fg)">заканчиваются: ${lowCount}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
-      <div class="row-list">${mainStockList.slice(0, 8).map(rowTemplate).join('')}</div>
-      ${mainStockList.length > 8 ? `<div style="margin-top:10px"><a href="#/inventory">Ещё ${mainStockList.length - 8} →</a></div>` : ''}
+      ${['toner', 'ink'].map(t => {
+        const list = mainStockList.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t);
+        if(!list.length) return '';
+        return `
+        <div class="type-head">${TYPE_LABELS[t]} · ${list.reduce((s, c) => s + c.stock, 0)} шт.</div>
+        <div class="row-list">${list.slice(0, 8).map(rowTemplate).join('')}</div>
+        ${list.length > 8 ? `<div style="margin-top:8px"><a href="#/inventory" onclick="activeFilter='${t}'">Ещё ${list.length - 8} →</a></div>` : ''}`;
+      }).join('')}
     </div>`}
 
     ${refillOverviewTemplate()}
@@ -1786,7 +1805,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
