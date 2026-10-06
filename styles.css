@@ -397,5 +397,3 @@ body.readonly .edit-only{display:none!important}
 a.installed-row{text-decoration:none}
 
 /* toner / ink split */
-.type-head{font-size:14px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 8px}
-.type-head:first-of-type{margin-top:4px}

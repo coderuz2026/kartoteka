@@ -1059,6 +1059,31 @@ function openInstalledList(){
   </div>`;
 }
 
+// One separate block per kind — «Картриджи» (toner) and «Чернила» — with its own total on
+// the main shelf, this month's in/out and its own list of models.
+function typeBlockTemplate(t, sortedList){
+  const list = sortedList.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t);
+  const isInk = t === 'ink';
+  const color = isInk ? INK_COLOR : TONER_COLOR;
+  const total = list.reduce((s, c) => s + c.stock, 0);
+  const inM = list.reduce((s, c) => s + monthQtyOf(c, 'receive'), 0);
+  const outM = list.reduce((s, c) => s + monthQtyOf(c, 'issue'), 0);
+  return `
+    <div class="type-block">
+      <div class="type-block-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-radius:14px;background:var(--card);border:1px solid var(--border);border-left:6px solid ${color};margin-bottom:10px">
+        <div style="min-width:0">
+          <div style="font-size:18px;font-weight:800">${isInk ? 'Чернила' : 'Картриджи'}</div>
+          <div style="font-size:13px;color:var(--faint);margin-top:2px">${list.length} ${plural(list.length, 'модель', 'модели', 'моделей')} · за месяц <span style="color:var(--ok-fg);font-weight:700">+${inM}</span> / <span style="color:var(--crit-fg);font-weight:700">−${outM}</span></div>
+        </div>
+        <div style="font-size:30px;font-weight:800;white-space:nowrap">${total}<small style="font-size:14px;color:var(--faint);margin-left:4px">шт.</small></div>
+      </div>
+      ${list.length
+        ? `<div class="row-list">${list.slice(0, 8).map(rowTemplate).join('')}</div>
+           ${list.length > 8 ? `<div style="margin-top:8px"><a href="#/inventory" onclick="activeFilter='${t}'">Ещё ${list.length - 8} →</a></div>` : ''}`
+        : `<div class="row-list empty-state" style="padding:20px">${isInk ? 'Чернил пока нет. Добавьте: «Новый картридж» → тип «Чернила».' : 'Картриджей пока нет.'}</div>`}
+    </div>`;
+}
+
 /* ---------- views ---------- */
 function renderDashboardView(){
   const totalUnits = state.cartridges.reduce((s,c) => s + totalStock(c), 0);
@@ -1109,14 +1134,9 @@ function renderDashboardView(){
     </div>` : `
     <div class="section">
       <div class="section-head"><h2>Остатки на ${escapeHtml(whName(MAIN_WH))}${needCount ? ` · <span style="color:var(--crit-fg)">закончились: ${needCount}</span>` : ''}${lowCount ? ` · <span style="color:var(--low-fg)">заканчиваются: ${lowCount}</span>` : ''}</h2><a href="#/inventory">Все картриджи →</a></div>
-      ${['toner', 'ink'].map(t => {
-        const list = mainStockList.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t);
-        if(!list.length) return '';
-        return `
-        <div class="type-head" style="font-size:14px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 8px">${t === 'ink' ? 'Чернила' : 'Картриджи (тонер)'} · ${list.reduce((s, c) => s + c.stock, 0)} шт.</div>
-        <div class="row-list">${list.slice(0, 8).map(rowTemplate).join('')}</div>
-        ${list.length > 8 ? `<div style="margin-top:8px"><a href="#/inventory" onclick="activeFilter='${t}'">Ещё ${list.length - 8} →</a></div>` : ''}`;
-      }).join('')}
+      <div class="type-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;align-items:start">
+        ${typeBlockTemplate('toner', mainStockList)}${typeBlockTemplate('ink', mainStockList)}
+      </div>
     </div>`}
 
     ${refillOverviewTemplate()}
@@ -1830,7 +1850,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -1848,7 +1868,15 @@ function updateInventoryList(){
     body.innerHTML = `<div class="empty-state"><div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Склад пуст</div>Добавьте первый картридж — вручную или отсканируйте штрих-код.<div style="margin-top:16px" class="edit-only"><button class="btn-primary" onclick="openCartridgeCreate()">${ICONS.plus}Новый картридж</button></div></div>`;
     return;
   }
-  body.innerHTML = list.length ? list.map(rowTemplate).join('') : `<div class="empty-state">Ничего не найдено</div>`;
+  if(!list.length){ body.innerHTML = `<div class="empty-state">Ничего не найдено</div>`; return; }
+  // Cartridges and ink as two separate blocks whenever both are in the list.
+  const groups = ['toner', 'ink'].map(t => ({t, items: list.filter(c => (c.type === 'ink' ? 'ink' : 'toner') === t)})).filter(g => g.items.length);
+  body.innerHTML = groups.length < 2 ? list.map(rowTemplate).join('') : groups.map(g => `
+    <div class="inv-type-head" style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:var(--paper);border-left:6px solid ${g.t === 'ink' ? INK_COLOR : TONER_COLOR};font-weight:800">
+      <span>${g.t === 'ink' ? 'Чернила' : 'Картриджи'}</span>
+      <span style="color:var(--faint);font-weight:600;font-size:14px">${g.items.length} ${plural(g.items.length, 'модель', 'модели', 'моделей')} · ${g.items.reduce((s, c) => s + c.stock, 0)} шт.</span>
+    </div>
+    ${g.items.map(rowTemplate).join('')}`).join('');
 }
 function setFilter(key){
   activeFilter = key;
