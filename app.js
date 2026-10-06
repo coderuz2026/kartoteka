@@ -334,6 +334,9 @@ function stopCloudListeners(){
 }
 function startCloudListeners(){
   stopCloudListeners();
+  cloud.loadStart = Date.now();
+  setTimeout(() => { if(!cloud.rolesReady) render({keepScroll: true}); }, 3100);
+  setTimeout(() => { if(!cloud.loaded) render({keepScroll: true}); }, 10000);
   const mainRef = firebase.firestore().collection('kartoteka').doc('main');
   const onError = e => {
     cloud.error = e.code === 'permission-denied'
@@ -1724,8 +1727,10 @@ function renderErrorView(e){
 }
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
+// Shown on the service screens so a screenshot tells which version the browser runs.
+const APP_VERSION = 30;
 function renderMessageView(title, text){
-  return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}</div></div>`;
+  return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
 
 /* ---------- inventory list update (partial re-render, keeps input focus) ---------- */
@@ -3392,7 +3397,16 @@ function render(opts){
     if(cloud.error) gate = renderMessageView('Нет доступа к данным', escapeHtml(cloud.error));
     else if(!cloud.authChecked) gate = renderMessageView('Загрузка…', 'Подключаемся к общей базе');
     else if(!cloud.user) gate = renderLoginView();
-    else if(!cloud.loaded || !cloud.rolesReady) gate = renderMessageView('Загрузка…', 'Получаем данные из общей базы');
+    // The roles only hide buttons (the Firestore rules do the real blocking), so after
+    // 3 s without them the app opens anyway instead of waiting forever.
+    else if(!cloud.loaded || (!cloud.rolesReady && Date.now() - (cloud.loadStart || 0) < 3000)){
+      // After a while, say what is still missing instead of spinning silently.
+      const waiting = [cloud.mainDoc === undefined ? 'основные данные' : '', cloud.monthDocs === undefined ? 'история' : '', !cloud.rolesReady ? 'права доступа' : ''].filter(Boolean);
+      const slow = cloud.loadStart && Date.now() - cloud.loadStart > 9000;
+      gate = renderMessageView('Загрузка…', 'Получаем данные из общей базы' + (slow
+        ? `<br><br><b>Долго ждём:</b> ${waiting.join(', ') || 'обработку данных'}.<br>Проверьте интернет и нажмите «Обновить».<br><button class="btn-secondary" style="margin-top:12px" onclick="location.reload()">Обновить</button>`
+        : ''));
+    }
   }
   document.body.classList.toggle('locked', !!gate);
   const readOnly = isReadOnly();
