@@ -1173,10 +1173,14 @@ function modelBarsTemplate(t){
     const st = statusOf(c);
     const warn = st === 'ok' ? '' : st === 'low' ? `<span class="v-flag v-low">⚠ мало</span>` : `<span class="v-flag v-out">✕ нет</span>`;
     const group = c.group ? ` · вместе с взаимозаменяемыми ${groupMainStock(c)} шт.` : '';
+    // Ink of one series differs only by color, so the color is shown in words and on the bar
+    // itself; toner is nearly always black, so only a non-black one gets its color named.
+    const showColor = t === 'ink' || c.color !== 'Чёрный';
+    const barColor = t === 'ink' ? colorHexOf(c) : color;
     return `
-      <a class="v-row" href="#/detail/${c.id}" data-tip="${escapeHtml(c.name)}: ${c.stock} шт. на ${escapeHtml(whName(MAIN_WH))}${escapeHtml(group)}">
-        <span class="v-row-name">${escapeHtml(c.name)}</span>
-        <span class="v-track">${c.stock ? `<span class="v-seg" style="width:${c.stock / max * 100}%;background:${color}"></span>` : ''}<span class="v-limit" style="left:${LOW_STOCK / max * 100}%"></span></span>
+      <a class="v-row" href="#/detail/${c.id}" data-tip="${escapeHtml(c.name)} · ${escapeHtml(c.color)}: ${c.stock} шт. на ${escapeHtml(whName(MAIN_WH))}${escapeHtml(group)}">
+        <span class="v-row-name"><span class="v-swatch" style="background:${colorHexOf(c)}"></span>${escapeHtml(c.name)}${showColor ? `<small>${escapeHtml(c.color)}</small>` : ''}</span>
+        <span class="v-track">${c.stock ? `<span class="v-seg" style="width:${c.stock / max * 100}%;background:${barColor}"></span>` : ''}<span class="v-limit" style="left:${LOW_STOCK / max * 100}%"></span></span>
         <span class="v-row-val">${c.stock}${warn}</span>
       </a>`;
   }).join('') + (list.length > shown.length ? `<a class="v-more" href="#/inventory" onclick="activeFilter='${t}'">ещё ${list.length - shown.length} →</a>` : '');
@@ -1308,6 +1312,8 @@ const VIZ_CSS = `
 .v-row:hover{background:var(--paper)}
 .v-row-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .v-row-name small{display:block;font-weight:500;color:var(--faint);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.v-swatch{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px;vertical-align:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.v-row-name .v-swatch ~ small{padding-left:18px}
 .v-track{position:relative;display:flex;gap:2px;height:12px;border-radius:99px;background:var(--paper);overflow:visible}
 .v-seg{height:100%;border-radius:99px;min-width:4px}
 .v-limit{position:absolute;top:-4px;bottom:-4px;border-left:2px dashed var(--low-dot);opacity:.7}
@@ -2068,7 +2074,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
