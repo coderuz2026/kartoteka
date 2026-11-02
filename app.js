@@ -2074,7 +2074,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -2240,10 +2240,21 @@ function removeMovementCode(code){
   modalState.codes = modalState.codes.filter(x => x !== code);
   renderModal();
 }
-// Cartridges of this model now standing in the chosen printer (they come out when a new one goes in).
+// Cartridges in a printer that the new one replaces: the same slot means the same model,
+// an interchangeable one, or any cartridge of the same color (a mono printer has one slot,
+// an ink printer one per color). They come out when the new one goes in.
+function slotUnits(st, printerId, c, skipCodes){
+  if(!printerId || !c) return [];
+  const color = normalizeColor(c.color);
+  return st.units.filter(u => {
+    if(u.status !== 'installed' || u.printerId !== printerId || (skipCodes || []).includes(u.code)) return false;
+    const x = st.cartridges.find(y => y.id === u.cid);
+    return !x || x.id === c.id || (c.group && x.group === c.group) || normalizeColor(x.color) === color;
+  });
+}
 function oldUnitsInPrinter(m){
   if(!m || m.type !== 'issue' || !m.printerId) return [];
-  return state.units.filter(u => u.status === 'installed' && u.printerId === m.printerId && u.cid === m.cartridgeId && !m.codes.includes(u.code));
+  return slotUnits(state, m.printerId, state.cartridges.find(x => x.id === m.cartridgeId), m.codes);
 }
 function setMovementPrinter(id){
   if(!modalState) return;
@@ -2359,10 +2370,16 @@ function renderModal(){
         </div>
       </div>`;
     const old = oldUnitsInPrinter(modalState);
+    // Everything standing in the printer now, so a forgotten old cartridge is seen before saving.
+    const inside = installedIn(modalState.printerId).filter(u => !modalState.codes.includes(u.code));
+    const unitName = u => { const x = state.cartridges.find(y => y.id === u.cid); return x ? x.name + (normalizeColor(x.color) !== 'Чёрный' ? ' ' + x.color : '') : 'Картридж'; };
     if(modalState.printerId) whFields += `
+      <div class="scan-info" style="margin:0 0 8px;${inside.length ? '' : 'background:var(--paper);color:var(--faint)'}">${inside.length
+        ? `Сейчас в этом принтере: ${inside.map(u => `<br><b>${escapeHtml(unitName(u))}</b> · <span class="mono">${escapeHtml(u.code)}</span>${u.since ? ' · с ' + fmtDate(u.since) : ''}${u.by ? ', ' + escapeHtml(u.by) : ''}${old.includes(u) ? '' : ' — остаётся'}`).join('')}`
+        : 'В этом принтере не отмечено ни одного картриджа.'}</div>
       <label class="check-row"><input type="checkbox" ${modalState.returnOld ? 'checked' : ''} onchange="modalState.returnOld=this.checked">
         <span>${old.length
-          ? `Снятый из принтера картридж <b class="mono">${escapeHtml(old.map(u => u.code).join(', '))}</b> положить на склад «${escapeHtml(whName(modalState.wh))}» как пустой`
+          ? `Снятый из принтера ${escapeHtml(unitName(old[0]))} <b class="mono">${escapeHtml(old.map(u => u.code).join(', '))}</b> положить на склад «${escapeHtml(whName(modalState.wh))}» как пустой`
           : `Старый картридж, снятый из принтера, положить на склад «${escapeHtml(whName(modalState.wh))}» как пустой (для заправки)`}</span></label>`;
     summary = `${escapeHtml(whName(modalState.wh))}: ${have} → ${Math.max(0, have - qty)} шт.`;
     // This model ran out here, but an interchangeable one may be on the same shelf.
@@ -2511,7 +2528,7 @@ async function submitMovement(){
         message = `Расход записан (${nameOf(src)}): ${c.name} −${qty}`;
         meta = [nameOf(src), printer ? printer.name : '', m.party.trim()].filter(Boolean).join(' · ');
         if(returnOld && printer){
-          const old = st.units.filter(u => u.status === 'installed' && u.printerId === printer.id && u.cid === c.id && !codes.includes(u.code));
+          const old = slotUnits(st, printer.id, c, codes);
           if(old.length){
             old.forEach(u => Object.assign(u, {status:'empty', wh: src, since: today}));
           } else if(!findUnit(st, emptyCode)){
@@ -2520,10 +2537,15 @@ async function submitMovement(){
             st.units.push(u);
             old.push(u);
           }
-          if(old.length){
-            addHistoryEntry(st, c, {type:'return', wh: src, qty: old.length, result: have - qty, codes: old.map(u => u.code), printerId: printer.id, printerName: printer.name, date: today, who, dept: ''});
-            message += ` · снятый пустой → ${nameOf(src)}`;
-          }
+          // The old one may be another model — its return goes into that model's history.
+          [...new Set(old.map(u => u.cid))].forEach(cid => {
+            const oc = st.cartridges.find(x => x.id === cid);
+            if(!oc) return;
+            const list = old.filter(u => u.cid === cid);
+            if(!st.history[oc.id]) st.history[oc.id] = [];
+            addHistoryEntry(st, oc, {type:'return', wh: src, qty: list.length, result: whStock(oc, src), codes: list.map(u => u.code), printerId: printer.id, printerName: printer.name, date: today, who, dept: ''});
+          });
+          if(old.length) message += ` · снятый пустой → ${nameOf(src)}`;
         }
       } else {
         const toHave = whStock(c, m.to);
@@ -3549,6 +3571,18 @@ function onBarcodeScanned(code){
   // A cartridge with its own barcode: show where it is and what can be done with it.
   if(findUnit(state, code)){ openUnitCard(code); return; }
   const c = findCartridgeByBarcode(code);
+  // A printer's serial number: install into it, starting from the model standing there now.
+  const p = !c && printerBySerial(code);
+  if(p){
+    const inside = installedIn(p.id);
+    const last = printerInstalls(p.id)[0];
+    const cid = inside.length ? inside[0].cid : last ? last.c.id : null;
+    toast(`Принтер: ${p.name}` + (inside.length ? ` · в нём ${inside.length} шт.` : ''));
+    if(isReadOnly()){ document.getElementById('modal-root').innerHTML = ''; location.hash = '#/printers'; return; }
+    openMovement(cid, 'issue');
+    if(modalState) setMovementPrinter(p.id);
+    return;
+  }
   if(isReadOnly()){
     document.getElementById('modal-root').innerHTML = '';
     if(c) location.hash = '#/detail/' + c.id;
@@ -3577,9 +3611,13 @@ function onBarcodeScannedInModal(code){
   if(modalState) renderModal();
 }
 // Picks the printer in an open расход by its scanned serial number.
+function printerBySerial(code){
+  const trimmed = String(code || '').trim();
+  return trimmed ? state.printers.find(x => x.serial && x.serial !== '—' && x.serial === trimmed) : undefined;
+}
 function onBarcodeScannedPrinterInModal(code){
   const trimmed = String(code).trim();
-  const p = state.printers.find(x => x.serial && x.serial !== '—' && x.serial === trimmed);
+  const p = printerBySerial(trimmed);
   if(p){
     toast(`Принтер: ${p.name}`);
     if(modalState){ setMovementPrinter(p.id); return; }
