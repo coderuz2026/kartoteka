@@ -1047,7 +1047,7 @@ function openInstalledList(){
       <p style="margin:6px 0 10px;font-size:15px;color:var(--faint)">Нажмите на строку — откроется история картриджа.</p>
       ${groups.filter(g => g.list.length).map(g => `
         <div class="unit-group-head" style="margin-top:14px">${escapeHtml(g.title)} · ${g.list.length}</div>
-        ${g.list.sort((a,b) => (printerOf(a) || {name:''}).name.localeCompare((printerOf(b) || {name:''}).name)).map(row).join('')}`).join('')}
+        ${g.list.sort((a,b) => comparePrinters(printerOf(a) || {name:''}, printerOf(b) || {name:''})).map(row).join('')}`).join('')}
     </div>
   </div>`;
 }
@@ -1590,18 +1590,19 @@ function printerCardTemplate(p){
   const byCartridge = {};
   installs.forEach(({h, c}) => { byCartridge[c.id] = byCartridge[c.id] || {c, qty:0}; byCartridge[c.id].qty += h.qty; });
   const last = installs[0];
-  const sub = [p.location, p.serial && p.serial !== '—' ? 'с/н ' + p.serial : ''].filter(Boolean).join(' · ') || 'Место не указано';
+  // Printers are listed by place, so the place is the title and the model sits under it.
+  const sub = [p.location ? p.name : 'Место не указано', p.serial && p.serial !== '—' ? 'с/н ' + p.serial : ''].filter(Boolean).join(' · ');
   return `
   <div class="card" style="padding:16px 18px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-      <div style="display:flex;align-items:center;gap:12px;min-width:0">
+    <div class="p-head">
+      <div class="p-title">
         <div class="icon-btn" style="background:var(--paper-2);flex-shrink:0">${ICONS.printer}</div>
         <div style="min-width:0">
-          <div style="font-size:17px;font-weight:700">${escapeHtml(p.name)}</div>
+          <div style="font-size:17px;font-weight:700">${escapeHtml(p.location || p.name)}</div>
           <div style="font-size:13px;color:var(--faint)">${escapeHtml(sub)}</div>
         </div>
       </div>
-      <div class="edit-only" style="display:flex;gap:6px;flex-shrink:0">
+      <div class="edit-only p-actions">
         <button class="btn-secondary p-empty-btn" title="Снять пустой картридж из этого принтера" onclick="openEmptyReturn('${p.id}')">↩ Снять пустой</button>
         <button class="icon-btn" style="width:40px;height:40px" title="Изменить" aria-label="Изменить принтер" onclick="openPrinterModal('${p.id}')">${ICONS.edit}</button>
         <button class="icon-btn" style="width:40px;height:40px" title="Удалить" aria-label="Удалить принтер" onclick="deletePrinter('${p.id}')">${ICONS.trash}</button>
@@ -1616,8 +1617,14 @@ function printerCardTemplate(p){
     ${totalQty ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">${Object.values(byCartridge).sort((a,b) => b.qty - a.qty).map(({c, qty}) => `<a href="#/detail/${c.id}" class="tag" style="display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:${colorHexOf(c)}"></span>${escapeHtml(c.name)} · ${qty} шт.</a>`).join('')}</div>` : ''}
   </div>`;
 }
+// By place in natural order — «1 этаж» before «2 этаж», «№2» before «№10» — then by model.
+const NATURAL = new Intl.Collator('ru', {numeric: true, sensitivity: 'base'});
+function comparePrinters(a, b){
+  return (!a.location) - (!b.location) || NATURAL.compare(a.location || '', b.location || '') || NATURAL.compare(a.name || '', b.name || '');
+}
+function sortedPrinters(){ return [...state.printers].sort(comparePrinters); }
 function renderPrintersView(){
-  const printers = [...state.printers].sort((a,b) => a.name.localeCompare(b.name));
+  const printers = sortedPrinters();
   // Group by the warehouse/branch the printer stands in.
   const groups = activeWarehouses().map(w => ({title: w.name, list: printers.filter(p => p.wh === w.id)}));
   groups.push({title: 'Склад не указан', list: printers.filter(p => !activeWarehouses().some(w => w.id === p.wh))});
@@ -2074,7 +2081,7 @@ function renderErrorView(e){
 // Errors in buttons show up as a message instead of silently doing nothing.
 window.addEventListener('error', e => { try{ toast('Ошибка: ' + (e.message || 'неизвестная')); }catch(x){} });
 // Shown on the service screens so a screenshot tells which version the browser runs.
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 function renderMessageView(title, text){
   return `<div class="login-wrap"><div class="card login-card" style="text-align:center"><h1 style="font-size:22px;margin-bottom:8px">${title}</h1><p style="margin:0;font-size:15px;color:var(--muted)">${text}</p>${cloud.user ? `<button class="btn-secondary" style="margin-top:18px" onclick="signOutCloud()">Выйти из аккаунта</button>` : ''}<div style="margin-top:14px;font-size:12px;color:var(--faint)">версия ${APP_VERSION}</div></div></div>`;
 }
@@ -2265,14 +2272,48 @@ function setMovementPrinter(id){
   if(!modalState.codes.length && p && activeWarehouses().some(w => w.id === p.wh)) modalState.wh = p.wh;
   renderModal();
 }
-function printerOptionsTemplate(selectedId){
-  const printers = [...state.printers].sort((a,b) => a.name.localeCompare(b.name));
-  const opt = p => `<option value="${p.id}" ${p.id===selectedId?'selected':''}>${escapeHtml(p.name)}${p.location ? ' — ' + escapeHtml(p.location) : ''}</option>`;
+// A printer picker that reads well on a phone: the place in bold, the model under it,
+// what stands in it now, and a search box. onPick names the global function given the id.
+function printerPickerTemplate(selectedId, onPick){
+  const sel = state.printers.find(p => p.id === selectedId);
+  const inside = id => installedIn(id).map(u => { const c = state.cartridges.find(x => x.id === u.cid); return c ? c.name : ''; }).filter(Boolean).join(', ');
+  const row = p => {
+    const now = inside(p.id);
+    const q = [p.location, p.name, p.serial].filter(Boolean).join(' ').toLowerCase();
+    return `<button type="button" class="pp-row ${p.id === selectedId ? 'on' : ''}" data-q="${escapeHtml(q)}" onclick="${onPick}('${p.id}')"><b>${escapeHtml(p.location || p.name)}</b><small>${p.location ? escapeHtml(p.name) : 'место не указано'}${now ? ' · сейчас: ' + escapeHtml(now) : ''}</small></button>`;
+  };
+  const printers = sortedPrinters();
   const groups = activeWarehouses().map(w => ({label: w.name, list: printers.filter(p => p.wh === w.id)}));
-  const rest = printers.filter(p => !activeWarehouses().some(w => w.id === p.wh));
-  return `<option value="">— не указан —</option>`
-    + groups.filter(g => g.list.length).map(g => `<optgroup label="${escapeHtml(g.label)}">${g.list.map(opt).join('')}</optgroup>`).join('')
-    + (rest.length ? `<optgroup label="Склад не указан">${rest.map(opt).join('')}</optgroup>` : '');
+  groups.push({label: 'Склад не указан', list: printers.filter(p => !activeWarehouses().some(w => w.id === p.wh))});
+  return `
+    <div class="pp">
+      <button type="button" class="input pp-btn" onclick="togglePrinterPicker(this)">${sel
+        ? `<b>${escapeHtml(sel.location || sel.name)}</b>${sel.location ? `<small>${escapeHtml(sel.name)}</small>` : ''}`
+        : '<span style="color:var(--faint)">— выберите принтер —</span>'}<span class="pp-caret">▾</span></button>
+      <div class="pp-panel" hidden>
+        <input class="input pp-search" placeholder="Поиск: этаж, кабинет, модель" oninput="filterPrinterPicker(this)">
+        <div class="pp-list">
+          <button type="button" class="pp-row ${selectedId ? '' : 'on'}" data-q="" onclick="${onPick}('')"><b>— не указан —</b></button>
+          ${groups.filter(g => g.list.length).map(g => `<div class="pp-group">${escapeHtml(g.label)} · ${g.list.length}</div>${g.list.map(row).join('')}`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+function togglePrinterPicker(btn){
+  const panel = btn.nextElementSibling;
+  panel.hidden = !panel.hidden;
+  if(!panel.hidden && !isTouchDevice()) panel.querySelector('.pp-search').focus();
+}
+function filterPrinterPicker(input){
+  const q = input.value.trim().toLowerCase();
+  const list = input.nextElementSibling;
+  list.querySelectorAll('.pp-row').forEach(r => { r.hidden = !!q && !r.dataset.q.includes(q); });
+  // A warehouse heading stays only while one of its printers matches.
+  list.querySelectorAll('.pp-group').forEach(g => {
+    let n = g.nextElementSibling, any = false;
+    for(; n && n.classList.contains('pp-row'); n = n.nextElementSibling) if(!n.hidden) any = true;
+    g.hidden = !any;
+  });
 }
 function closeMovement(){
   modalState = null;
@@ -2364,8 +2405,8 @@ function renderModal(){
     whFields += `
       <div class="field">
         <span class="field-lbl">В какой принтер</span>
-        <div style="display:flex;gap:8px">
-          <select class="input" style="flex:1;min-width:0" onchange="setMovementPrinter(this.value)">${printerOptionsTemplate(modalState.printerId)}</select>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div style="flex:1;min-width:0">${printerPickerTemplate(modalState.printerId, 'setMovementPrinter')}</div>
           <button class="icon-btn" title="Сканировать серийный номер принтера" onclick="openScanner(onBarcodeScannedPrinterInModal)">${ICONS.barcode}</button>
         </div>
       </div>`;
@@ -3355,7 +3396,7 @@ function renderEmptyModal(){
       </div>
       <div class="field" style="margin-top:16px">
         <span class="field-lbl">Из какого принтера</span>
-        <select class="input" onchange="setEmptyPrinter(this.value)">${printerOptionsTemplate(s.printerId)}</select>
+        ${printerPickerTemplate(s.printerId, 'setEmptyPrinter')}
       </div>
       ${inside.length ? `
       <div class="field">
